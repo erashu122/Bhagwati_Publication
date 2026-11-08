@@ -91,7 +91,8 @@ export async function migrateAuthorPortrait(tx: DatabaseExecutor, seed: boolean)
     );
   `);
   if (!seed) return;
-  const bytes = await readFile(resolve('assets/author-saraswat.png'));
+  const asset = process.env.VERCEL === '1' ? 'backend/assets/author-saraswat.png' : 'assets/author-saraswat.png';
+  const bytes = await readFile(resolve(asset));
   await tx.query(
     "INSERT INTO author_portrait (media_type, bytes) SELECT 'image/png', $1 FROM store_content WHERE lower(btrim(content->>'authorName')) = lower($2)",
     [bytes, author]

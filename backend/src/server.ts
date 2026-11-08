@@ -14,16 +14,19 @@ import { openDatabase } from './database.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
 import { addressField, cartEntries, emailField, field, passwordField, record, RequestError, uuidField } from './validation.ts';
 
-const development = process.argv.includes('--dev');
+const onVercel = process.env.VERCEL === '1';
+const development = !onVercel && process.argv.includes('--dev');
 const frontend = resolve('../frontend');
 const distribution = resolve(frontend, 'dist');
-if (!development && !existsSync(resolve(distribution, 'index.html'))) {
+if (!onVercel && !development && !existsSync(resolve(distribution, 'index.html'))) {
   throw new Error('Run npm run build before starting the store.');
+}
+if (onVercel && !process.env.DATABASE_URL?.trim()) {
+  throw new Error('Set DATABASE_URL in the Vercel project environment to start the store API.');
 }
 
 const db = await openDatabase();
 const app = express();
-const server = createServer(app);
 const api = express.Router();
 
 const customerFields = 'id, email, full_name AS "fullName", address, operator';
@@ -333,21 +336,27 @@ const sendError: ErrorRequestHandler = (error, _request, response, next) => {
 };
 
 app.use('/api', api, sendError);
-if (development) {
-  const { createServer: createViteServer } = await import('vite');
-  const vite = await createViteServer({ root: frontend, server: { middlewareMode: true, hmr: { server } } });
-  app.use(vite.middlewares);
-} else {
-  app.use(express.static(distribution));
+
+if (!onVercel) {
+  const server = createServer(app);
+  if (development) {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({ root: frontend, server: { middlewareMode: true, hmr: { server } } });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(distribution));
+  }
+
+  const port = Number(process.env.PORT || (development ? 5173 : 4000));
+  const host = process.env.HOST || '127.0.0.1';
+  server.listen(port, host, () => console.log(`Bhagwati Publication · http://${host}:${port}/`));
+
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => server.close(async () => {
+      await db.close();
+      process.exit();
+    }));
+  }
 }
 
-const port = Number(process.env.PORT || (development ? 5173 : 4000));
-const host = process.env.HOST || '127.0.0.1';
-server.listen(port, host, () => console.log(`Bhagwati Publication · http://${host}:${port}/`));
-
-for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-  process.once(signal, () => server.close(async () => {
-    await db.close();
-    process.exit();
-  }));
-}
+export default app;
