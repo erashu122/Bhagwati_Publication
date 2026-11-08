@@ -1,0 +1,28 @@
+{
+  "name": "@bhagwati/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env src/server.ts --dev",
+    "check": "tsc --noEmit",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/backend/src/server.js",
+    "operator": "node --env-file-if-exists=.env src/operator.ts",
+    "db:check": "node --env-file-if-exists=.env src/import-data.ts --check",
+    "db:import": "node --env-file-if-exists=.env src/import-data.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.4.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}

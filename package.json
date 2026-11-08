@@ -1,0 +1,18 @@
+{
+  "name": "bhagwati-publication",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["frontend", "backend"],
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "dev": "npm run dev --workspace backend",
+    "check": "npm run check --workspaces",
+    "build": "npm run build --workspaces",
+    "preview": "npm start --workspace backend",
+    "start": "npm start --workspace backend",
+    "operator": "npm run operator --workspace backend --",
+    "db:check": "npm run db:check --workspace backend",
+    "db:import": "npm run db:import --workspace backend"
+  }
+}
