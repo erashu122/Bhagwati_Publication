@@ -50,7 +50,12 @@ export async function lockPostgresSchema(tx: DatabaseExecutor) {
 }
 
 export async function openDatabase() {
-  const url = process.env.DATABASE_URL?.trim();
+  const onVercel = process.env.VERCEL === '1';
+  const neonUrl = onVercel ? process.env.NEON_DATABASE_URL?.trim() : undefined;
+  const url = neonUrl || process.env.DATABASE_URL?.trim();
+  if (onVercel && !url) {
+    throw new Error('Set NEON_DATABASE_URL or DATABASE_URL in the Vercel project environment to start the store API.');
+  }
   const db = url ? openPostgresDatabase(url) : await openEmbeddedDatabase();
   try {
     await db.transaction(async tx => {
@@ -61,6 +66,7 @@ export async function openDatabase() {
   } catch (error) {
     await db.close().catch(() => {});
     if (!url) throw error;
-    throw new Error('Could not open the PostgreSQL store. Check DATABASE_URL and database permissions (' + databaseErrorCode(error) + ').');
+    const variable = neonUrl ? 'NEON_DATABASE_URL' : 'DATABASE_URL';
+    throw new Error('Could not open the PostgreSQL store. Check ' + variable + ' and database permissions (' + databaseErrorCode(error) + ').');
   }
 }

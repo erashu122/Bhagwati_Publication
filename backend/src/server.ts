@@ -21,9 +21,6 @@ const distribution = resolve(frontend, 'dist');
 if (!onVercel && !development && !existsSync(resolve(distribution, 'index.html'))) {
   throw new Error('Run npm run build before starting the store.');
 }
-if (onVercel && !process.env.DATABASE_URL?.trim()) {
-  throw new Error('Set DATABASE_URL in the Vercel project environment to start the store API.');
-}
 
 const db = await openDatabase();
 const app = express();
