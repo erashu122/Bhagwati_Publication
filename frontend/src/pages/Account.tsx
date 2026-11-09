@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ArrowRight, Bell, BookOpen, CheckCircle2, Eye, EyeOff, Heart, LayoutGrid, LogOut, MapPin, Package, ShieldCheck, ShoppingBag, Tag, UserRound, Wallet } from 'lucide-react';
 import { Link, Navigate, useNavigate, useSearchParams, createSearchParams } from 'react-router-dom';
 import type { Customer, Order } from '../../../shared/store';
+import { maximumPasswordLength, minimumPasswordLength, passwordHint, passwordPattern } from '../../../shared/password';
 import { AccountLoading, errorMessage, StoreError, storeRequest, useAccount } from '../account';
 import { AddressFields, indianMobilePattern, readAddress } from '../components/AddressFields';
 import { BookCover } from '../components/BookCover';
@@ -21,8 +22,9 @@ function PasswordField({ label = 'Password', name = 'password', create = false }
   return <div className="field">
     <label htmlFor={id}>{label}</label>
     <div className="password-input">
-      <input id={id} required name={name} type={visible ? 'text' : 'password'} maxLength={128}
-        minLength={create ? 12 : undefined} autoComplete={create ? 'new-password' : 'current-password'}
+      <input id={id} required name={name} type={visible ? 'text' : 'password'} maxLength={maximumPasswordLength}
+        minLength={create ? minimumPasswordLength : undefined} autoComplete={create ? 'new-password' : 'current-password'}
+        pattern={create ? passwordPattern.source : undefined} title={create ? passwordHint : undefined}
         autoCapitalize="none" spellCheck={false} />
       <button type="button" aria-controls={id} aria-label={visible ? 'Hide ' + label.toLowerCase() : 'Show ' + label.toLowerCase()}
         onClick={() => setVisible(value => !value)}>
@@ -86,7 +88,7 @@ export function SignIn({ register }: { register: boolean }) {
             autoComplete={register ? 'email' : 'username'} autoCapitalize="none" spellCheck={false} />
         </label>
         <PasswordField create={register} />
-        {register ? <p className="small-note">Use at least 12 characters.</p>
+        {register ? <p className="small-note">{passwordHint}</p>
           : <Link className="text-link forgot-password" to="/forgot-password">Forgot password?</Link>}
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Please wait…' : register ? 'Create account' : 'Sign in'} <ArrowRight size={17} aria-hidden="true" /></button>
@@ -155,7 +157,7 @@ export function ResetAdminPassword() {
               autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} /></label>
             <PasswordField label="New password" create />
             <PasswordField label="Confirm password" name="confirmPassword" create />
-            <p className="small-note">Use at least 12 characters.</p>
+            <p className="small-note">{passwordHint}</p>
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Set new password'} <ArrowRight size={17} aria-hidden="true" /></button>
           </form>

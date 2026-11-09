@@ -1,4 +1,5 @@
 import type { Address } from '../../shared/store.ts';
+import { maximumPasswordLength, minimumPasswordLength, passwordHint, passwordPattern } from '../../shared/password.ts';
 
 export class RequestError extends Error {
   status: number;
@@ -31,9 +32,12 @@ export function emailField(value: unknown) {
   return email;
 }
 
-export function passwordField(value: unknown, registering: boolean) {
-  if (typeof value !== 'string' || value.length > 128 || value.length < (registering ? 12 : 1)) {
-    throw new RequestError(400, registering ? 'Choose a password of 12 to 128 characters.' : 'Enter a valid password.');
+export function passwordField(value: unknown, creating: boolean) {
+  if (typeof value !== 'string' || value.length > maximumPasswordLength || !value.length) {
+    throw new RequestError(400, creating ? `Choose a password of ${minimumPasswordLength} to ${maximumPasswordLength} characters.` : 'Enter a valid password.');
+  }
+  if (creating && (value.length < minimumPasswordLength || !passwordPattern.test(value))) {
+    throw new RequestError(400, passwordHint);
   }
   return value;
 }

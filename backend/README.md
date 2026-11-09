@@ -38,7 +38,7 @@ WITH new_code AS MATERIALIZED (
 SELECT code AS recovery_code FROM new_code CROSS JOIN saved;
 ```
 
-Copy the result directly into **Recovery code** on the live **Forgot password?** page. Set a new password of at least 12 characters, then sign in as `admin`. The database stores a hash of the password. Treat the one-time recovery code like a password.
+Copy the result directly into **Recovery code** on the live **Forgot password?** page. Set a new password of at least 8 characters with an uppercase letter, a lowercase letter and a special character, then sign in as `admin`. The database stores a hash of the password. Treat the one-time recovery code like a password.
 
 ### Customer dashboard
 

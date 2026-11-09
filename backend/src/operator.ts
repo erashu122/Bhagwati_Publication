@@ -8,8 +8,7 @@ import { emailField, passwordField } from './validation.ts';
 const bootstrapAdmin = process.argv[2] === '--bootstrap-admin';
 const issueRecovery = process.argv[2] === '--issue-admin-recovery';
 const email = bootstrapAdmin || issueRecovery ? adminAccountEmail : emailField(process.argv[2]);
-const password = bootstrapAdmin ? passwordField(readFileSync(0, 'utf8').replace(/\r?\n$/, ''), false) : undefined;
-if (password !== undefined && password.length < 11) throw new Error('Choose an admin password of at least 11 characters.');
+const password = bootstrapAdmin ? passwordField(readFileSync(0, 'utf8').replace(/\r?\n$/, ''), true) : undefined;
 
 const db = await openDatabase();
 try {
