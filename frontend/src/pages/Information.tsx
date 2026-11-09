@@ -58,6 +58,7 @@ export function Contact() {
           <label className="field">Email<input required type="email" name="email" maxLength={254} autoComplete="email" defaultValue={customer?.email} /></label>
           <label className="field field-wide">Message<textarea required name="message" maxLength={2500} rows={6} /></label>
         </div>
+        <p className="small-note">The publisher receives your name, email and message so they can reply.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit enquiry'} <ArrowRight size={17} aria-hidden="true" /></button>
         <div role="status">{complete && <p className="feedback"><CheckCircle2 size={19} aria-hidden="true" />Your enquiry was saved for the publisher to review.</p>}</div>

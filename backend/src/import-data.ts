@@ -15,6 +15,7 @@ const tables = [
   { table: 'sessions', key: 'token_hash', type: 'text' },
   { table: 'orders', key: 'id', type: 'uuid' },
   { table: 'enquiries', key: 'id', type: 'uuid' },
+  { table: 'enquiry_settings', key: 'singleton', type: 'boolean', optional: true },
   { table: 'wishlist', key: 'id', type: 'uuid', optional: true },
   { table: 'coupons', key: 'code', type: 'text', optional: true },
   { table: 'notifications', key: 'id', type: 'text', optional: true },

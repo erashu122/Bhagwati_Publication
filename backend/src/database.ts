@@ -44,6 +44,11 @@ export async function initializeSchema(tx: DatabaseExecutor, seed = true) {
       message TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE enquiries ADD COLUMN IF NOT EXISTS email_status TEXT;
+    CREATE TABLE IF NOT EXISTS enquiry_settings (
+      singleton BOOLEAN PRIMARY KEY CHECK (singleton),
+      recipient TEXT NOT NULL
+    );
   `);
   await migrateCatalog(tx, seed);
   await migrateAuthorPortrait(tx, seed);

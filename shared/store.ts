@@ -64,7 +64,17 @@ export type StoreNotification = {
 
 export type StoreOrder = Order & { email: string; fullName: string };
 
-export type Enquiry = { id: string; fullName: string; email: string; message: string; createdAt: string };
+export type EnquiryEmailStatus = 'accepted' | 'failed' | 'unconfirmed';
+export type Enquiry = {
+  id: string;
+  fullName: string;
+  email: string;
+  message: string;
+  createdAt: string;
+  emailStatus: EnquiryEmailStatus | null;
+};
+
+export type EnquirySettings = { recipient: string; mailConfigured: boolean };
 
 export type PublisherOverview = {
   publishedBooks: number;

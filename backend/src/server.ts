@@ -11,6 +11,7 @@ import type { Book } from '../../shared/books.ts';
 import { canOrder } from '../../shared/books.ts';
 import { catalogRouter } from './catalog.ts';
 import { emailAdminRecovery } from './admin-recovery.ts';
+import { enquiryFields, enquirySettings, sendEnquiryEmail } from './enquiry-email.ts';
 import { couponCode, customerFeatures, notifyOrder } from './customer-features.ts';
 import { openDatabase } from './database.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
@@ -311,8 +312,34 @@ api.post('/enquiries', contactLimit, async (request, response) => {
   const name = field(body.fullName, 'name', 100);
   const email = emailField(body.email);
   const message = field(body.message, 'message', 2500);
-  await db.query('INSERT INTO enquiries (id, full_name, email, message) VALUES ($1, $2, $3, $4)', [randomUUID(), name, email, message]);
+  const id = randomUUID();
+  await db.query('INSERT INTO enquiries (id, full_name, email, message) VALUES ($1, $2, $3, $4)', [id, name, email, message]);
+  try {
+    await sendEnquiryEmail(db, id);
+  } catch {
+    console.warn('Could not update contact email status.');
+  }
   response.status(201).json({ received: true });
+});
+
+api.get('/publisher/enquiry-settings', async (request, response) => {
+  await requireCustomer(request, true);
+  response.json(await enquirySettings(db));
+});
+
+api.patch('/publisher/enquiry-settings', async (request, response) => {
+  await requireCustomer(request, true);
+  const recipient = emailField(record(request.body).recipient);
+  await db.query(`
+    INSERT INTO enquiry_settings (singleton, recipient) VALUES (TRUE, $1)
+    ON CONFLICT (singleton) DO UPDATE SET recipient = EXCLUDED.recipient
+  `, [recipient]);
+  response.json(await enquirySettings(db));
+});
+
+api.post('/publisher/enquiries/:id/email', async (request, response) => {
+  await requireCustomer(request, true);
+  response.json({ emailStatus: await sendEnquiryEmail(db, uuidField(request.params.id)) });
 });
 
 api.get('/publisher/overview', async (request, response) => {
@@ -345,7 +372,7 @@ api.get('/publisher', async (request, response) => {
        FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.created_at DESC`
   );
   const enquiries = await db.query<Enquiry>(
-    'SELECT id, full_name AS "fullName", email, message, created_at AS "createdAt" FROM enquiries ORDER BY created_at DESC'
+    `SELECT ${enquiryFields} FROM enquiries ORDER BY created_at DESC`
   );
   response.json({ orders: orders.rows, enquiries: enquiries.rows });
 });

@@ -44,6 +44,12 @@ Copy the result directly into **Recovery code** on the live **Forgot password?**
 
 Customers can edit their mobile number and default address, save a private UPI ID, and manage their wishlist and notifications. The admin dashboard can publish store announcements and create or deactivate percentage coupons. Active coupons are available to all signed-in customers. Checkout applies one coupon to the book subtotal and records the discount on the order. Shipping and tax remain subject to confirmation. Online payment collection requires a separate payment integration.
 
+### Contact inbox
+
+The contact form saves each message in **Admin → Enquiries** and sends it using `RESEND_API_KEY`. Set the initial inbox with `CONTACT_EMAIL` or reuse `ADMIN_RECOVERY_EMAIL`. Change the inbox from **Contact inbox → Save recipient**. This setting applies to future messages and email retries. The visitor's email is the reply address.
+
+Set `CONTACT_EMAIL_FROM` to a sender on a domain you verified in Resend to deliver to any inbox. If omitted, contact uses `ADMIN_RECOVERY_FROM` or Resend's test sender. The test sender can send only to the email on the Resend account. Failed sends stay visible in Enquiries, where an admin can retry them. If the provider's response is unconfirmed, check the inbox or the provider's logs before sending manually.
+
 ## Connect to PostgreSQL with pgAdmin
 
 1. Connect to the existing local PostgreSQL server in pgAdmin. Under **Login/Group Roles**, create `bhagwati_app`. Set a password on **Definition** and turn on **Can login?** under **Privileges**. Leave the cluster-wide admin privileges off.

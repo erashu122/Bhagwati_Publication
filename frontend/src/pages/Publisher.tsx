@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, Bell, BookOpen, ClipboardList, FileText, LayoutDashboard, Mail, RefreshCw, ShieldCheck, Tag, Tags, UserRound } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { nextOrderStatuses, orderStatusLabels } from '../../../shared/store';
-import type { Enquiry, Order, OrderStatus, StoreOrder } from '../../../shared/store';
+import type { Enquiry, EnquiryEmailStatus, EnquirySettings, Order, OrderStatus, StoreOrder } from '../../../shared/store';
 import { errorMessage, storeRequest, useAccount } from '../account';
 import { OrderCard, orderReference } from '../components/OrderCard';
 import { CatalogAdmin } from './CatalogAdmin';
@@ -21,6 +21,56 @@ const sections = [
   { id: 'announcements', label: 'Announcements', icon: Bell },
   { id: 'enquiries', label: 'Enquiries', icon: Mail }
 ] as const;
+
+const enquiryEmailLabels = {
+  accepted: 'Accepted by the mail provider',
+  failed: 'Email not sent',
+  unconfirmed: 'Email delivery unconfirmed'
+};
+
+function EnquiryInboxSettings() {
+  const [settings, setSettings] = useState<EnquirySettings | null>(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let current = true;
+    setError('');
+    storeRequest<EnquirySettings>('/publisher/enquiry-settings')
+      .then(data => { if (current) setSettings(data); })
+      .catch(error => { if (current) setError(errorMessage(error)); });
+    return () => { current = false; };
+  }, [reload]);
+
+  return <section className="form-panel feature-stack">
+    <h3>Contact inbox</h3>
+    <p>New Contact messages go to this email address. You can also read them below.</p>
+    {settings && <form key={settings.recipient} className="form-stack" onSubmit={async event => {
+      event.preventDefault();
+      const recipient = new FormData(event.currentTarget).get('recipient');
+      setBusy(true);
+      setMessage('');
+      setError('');
+      try {
+        setSettings(await storeRequest<EnquirySettings>('/publisher/enquiry-settings', 'PATCH', { recipient }));
+        setMessage('Contact email saved.');
+      } catch (error) {
+        setError(errorMessage(error));
+      } finally {
+        setBusy(false);
+      }
+    }}>
+      <label className="field">Recipient email<input name="recipient" type="email" required maxLength={254} defaultValue={settings.recipient} /></label>
+      <button className="button primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save recipient'}</button>
+    </form>}
+    {settings && !settings.mailConfigured && <p className="small-note">Email delivery needs a recipient and a mail provider key. Messages are saved below.</p>}
+    {message && <p className="feedback" role="status">{message}</p>}
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {!settings && (error ? <button type="button" className="button secondary" onClick={() => setReload(value => value + 1)}>Try again</button> : <p role="status">Loading contact inbox…</p>)}
+  </section>;
+}
 
 function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialStatus: string }) {
   const [data, setData] = useState<PublisherData | null>(null);
@@ -57,6 +107,22 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
     }
   }
 
+  async function sendEmail(id: string) {
+    setBusy(true);
+    setError('');
+    try {
+      const { emailStatus } = await storeRequest<{ emailStatus: EnquiryEmailStatus }>('/publisher/enquiries/' + id + '/email', 'POST', {});
+      setData(previous => previous && {
+        ...previous,
+        enquiries: previous.enquiries.map(item => item.id === id ? { ...item, emailStatus } : item)
+      });
+    } catch (error) {
+      setError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const orders = data?.orders.filter(order =>
     (!statusFilter || order.status === statusFilter) &&
     [order.fullName, order.email, orderReference(order.id)].some(value => value.toLowerCase().includes(search))
@@ -70,6 +136,7 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
       <p>{enquiries ? 'Read messages submitted through the store.' : 'Review requests and update fulfillment status.'}</p></div>
       <button type="button" className="button secondary" onClick={() => setReload(value => value + 1)} disabled={busy}><RefreshCw size={16} aria-hidden="true" /> Refresh</button>
     </div>
+    {enquiries && <EnquiryInboxSettings />}
     <div className="admin-filters">
       <label className="field">{enquiries ? 'Search enquiries' : 'Search orders'}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
       {!enquiries && <label className="field">Order status<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
@@ -80,6 +147,10 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
     {!data ? (!error && <p role="status">Loading the dashboard…</p>) : enquiries
       ? <div className="account-orders">{messages.length === 0 && <p>No enquiries found.</p>}{messages.map(enquiry => <article className="order-card enquiry" key={enquiry.id}>
         <h3>{enquiry.fullName}</h3><p>{enquiry.email} · {new Date(enquiry.createdAt).toLocaleDateString('en-IN')}</p><p>{enquiry.message}</p>
+        <p className="small-note">{enquiry.emailStatus ? enquiryEmailLabels[enquiry.emailStatus] : 'No email recorded'}</p>
+        {(!enquiry.emailStatus || enquiry.emailStatus === 'failed') && <button className="button secondary" type="button" disabled={busy} onClick={() => void sendEmail(enquiry.id)}>
+          {enquiry.emailStatus === 'failed' ? 'Retry email' : 'Send email to contact inbox'}
+        </button>}
       </article>)}</div>
       : <div className="account-orders">{orders.length === 0 && <p>No order requests found.</p>}{orders.map(order => <OrderCard order={order} key={order.id}>
         <p className="operator-customer">{order.fullName} · {order.email}</p>
