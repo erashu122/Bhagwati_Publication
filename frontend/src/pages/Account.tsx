@@ -96,9 +96,26 @@ export function SignIn({ register }: { register: boolean }) {
 
 export function ResetAdminPassword() {
   const { setCustomer } = useAccount();
+  const [sending, setSending] = useState(false);
+  const [delivery, setDelivery] = useState<{ error: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [complete, setComplete] = useState(false);
+
+  async function requestCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = new FormData(event.currentTarget).get('email');
+    setSending(true);
+    setDelivery(null);
+    try {
+      await storeRequest('/admin/recovery-email', 'POST', { email });
+      setDelivery({ error: false, message: 'If the address matches the recovery email, check your inbox and spam folder. A recent code remains valid for 30 minutes.' });
+    } catch (error) {
+      setDelivery({ error: true, message: errorMessage(error) });
+    } finally {
+      setSending(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,7 +139,13 @@ export function ResetAdminPassword() {
       <h1>{complete ? 'Password updated' : 'Reset admin password'}</h1>
       {complete ? <p className="feedback" role="status"><CheckCircle2 size={18} aria-hidden="true" /> Sign in with the ID <strong>admin</strong> and your new password.</p>
         : <>
-          <p className="page-intro">Use the one-time recovery code from the store owner. Your admin ID is <strong>admin</strong>.</p>
+          <p className="page-intro">Your admin ID is <strong>admin</strong>. Request a code using your recovery email, or enter a code you already have.</p>
+          <form className="form-stack recovery-email-form" onSubmit={requestCode}>
+            <label className="field">Recovery email<input name="email" type="email" required maxLength={254}
+              autoComplete="email" autoCapitalize="none" spellCheck={false} /></label>
+            <button className="button secondary" type="submit" disabled={sending}>{sending ? 'Requesting…' : 'Email me a code'}</button>
+            {delivery && <p className={delivery.error ? 'form-error' : 'small-note'} role={delivery.error ? 'alert' : 'status'}>{delivery.message}</p>}
+          </form>
           <form className="form-stack" onSubmit={submit}>
             <label className="field">Recovery code<input name="code" required type="password" maxLength={64}
               autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} /></label>

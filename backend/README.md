@@ -18,6 +18,8 @@ Use HTTPS and `SECURE_COOKIES=1` before exposing accounts beyond local developme
 
 To recover the `admin` sign-in, point the operator command at the store's database and run `npm run operator -- --issue-admin-recovery`. Enter the code in **Forgot password?** on the same store. It expires after 30 minutes, replaces any previous code, and can be used once. Setting the new password signs the admin out of existing sessions.
 
+To enable **Email me a code**, set `ADMIN_RECOVERY_EMAIL` to the owner's address and `RESEND_API_KEY` to a sending key. Set `ADMIN_RECOVERY_FROM` to a verified sender if sending outside the Resend account's own address. The default Resend test sender can send only to the address registered with Resend. Keep these settings in the server environment.
+
 ## Connect to PostgreSQL with pgAdmin
 
 1. Connect to the existing local PostgreSQL server in pgAdmin. Under **Login/Group Roles**, create `bhagwati_app`. Set a password on **Definition** and turn on **Can login?** under **Privileges**. Leave the cluster-wide admin privileges off.

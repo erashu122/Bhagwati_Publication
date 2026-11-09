@@ -1,7 +1,8 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { openDatabase } from './database.ts';
-import { adminAccountEmail, adminLogin, digest, passwordHash, verifyPassword } from './security.ts';
+import { adminAccountEmail, adminLogin, passwordHash, verifyPassword } from './security.ts';
+import { issueAdminRecovery } from './admin-recovery.ts';
 import { emailField, passwordField } from './validation.ts';
 
 const bootstrapAdmin = process.argv[2] === '--bootstrap-admin';
@@ -13,13 +14,9 @@ if (password !== undefined && password.length < 11) throw new Error('Choose an a
 const db = await openDatabase();
 try {
   if (issueRecovery) {
-    const code = randomBytes(32).toString('hex');
-    await db.query(`
-      INSERT INTO admin_recovery (singleton, token_hash, expires_at)
-      VALUES (TRUE, $1, NOW() + INTERVAL '30 minutes')
-      ON CONFLICT (singleton) DO UPDATE SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at
-    `, [digest(code)]);
-    console.log('One-time admin recovery code (expires in 30 minutes): ' + code);
+    const recovery = await issueAdminRecovery(db, true);
+    if (!recovery) throw new Error('Could not issue an admin recovery code.');
+    console.log('One-time admin recovery code (expires in 30 minutes): ' + recovery.code);
   } else if (password !== undefined) {
     const { rows } = await db.query<{ id: string }>(
       `INSERT INTO customers (id, email, full_name, password, operator)

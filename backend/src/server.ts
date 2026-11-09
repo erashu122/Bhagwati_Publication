@@ -10,6 +10,7 @@ import type { Customer, Enquiry, Order, OrderStatus, PublisherOverview, StoreOrd
 import type { Book } from '../../shared/books.ts';
 import { canOrder } from '../../shared/books.ts';
 import { catalogRouter } from './catalog.ts';
+import { emailAdminRecovery } from './admin-recovery.ts';
 import { openDatabase } from './database.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
 import { addressField, cartEntries, emailField, field, passwordField, record, RequestError, uuidField } from './validation.ts';
@@ -65,6 +66,14 @@ const contactLimit = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Too many messages. Please try again in a few minutes.' }
+});
+
+const recoveryEmailLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many code requests. Please try again in a few minutes.' }
 });
 
 async function signedInCustomer(request: Request): Promise<Customer | null> {
@@ -142,6 +151,12 @@ api.post('/login', authLimit, async (request, response) => {
   const { password: _storedPassword, ...customer } = account;
   await startSession(request, response, customer.id, _storedPassword);
   response.json({ customer });
+});
+
+api.post('/admin/recovery-email', recoveryEmailLimit, async (request, response) => {
+  const body = record(request.body);
+  await emailAdminRecovery(db, emailField(body.email));
+  response.status(202).json({ ok: true });
 });
 
 api.post('/admin/password-reset', authLimit, async (request, response) => {
