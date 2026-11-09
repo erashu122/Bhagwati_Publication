@@ -33,5 +33,5 @@ export const defaultContent: StoreContent = {
   contactIntro: 'Ask about books, bulk orders or publishing using the form below.',
   shipping: 'Print book requests require a delivery address. The publisher confirms availability, shipping charges and delivery options before dispatch. Digital titles do not require a shipping address.',
   returns: 'Return eligibility, timelines and the process for requesting a return are pending publisher confirmation.',
-  privacy: 'The cart saves book IDs and quantities in your browser. The store keeps your account details, order requests, delivery addresses and any enquiries you submit in its database. A browser cookie keeps you signed in. You can remove your default address from your profile.'
+  privacy: 'The cart saves book IDs and quantities in your browser. The store keeps your account details, order requests, delivery addresses and any enquiries you submit in its database. Your optional UPI ID, wishlist and notification history are saved to your account. A browser cookie keeps you signed in. You can remove your default address and UPI ID from your account.'
 };

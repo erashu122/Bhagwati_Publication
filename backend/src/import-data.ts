@@ -14,7 +14,11 @@ const tables = [
   { table: 'customers', key: 'id', type: 'uuid' },
   { table: 'sessions', key: 'token_hash', type: 'text' },
   { table: 'orders', key: 'id', type: 'uuid' },
-  { table: 'enquiries', key: 'id', type: 'uuid' }
+  { table: 'enquiries', key: 'id', type: 'uuid' },
+  { table: 'wishlist', key: 'id', type: 'uuid', optional: true },
+  { table: 'coupons', key: 'code', type: 'text', optional: true },
+  { table: 'notifications', key: 'id', type: 'text', optional: true },
+  { table: 'notification_reads', key: 'id', type: 'uuid', optional: true }
 ] as const;
 
 type Table = typeof tables[number];
@@ -26,6 +30,10 @@ async function copyTable(source: DatabaseExecutor, target: DatabaseExecutor, ent
   const { table, key, type } = entry;
   const identity = 'identity' in entry ? entry.identity : null;
   const override = identity ? ' OVERRIDING SYSTEM VALUE' : '';
+  if ('optional' in entry) {
+    const { rows } = await source.query('SELECT 1 WHERE to_regclass($1) IS NOT NULL', [table]);
+    if (!rows.length) return 0;
+  }
   let cursor: Cursor = null;
   let count = 0;
   while (true) {
@@ -35,8 +43,9 @@ async function copyTable(source: DatabaseExecutor, target: DatabaseExecutor, ent
     );
     if (!page.rows.length) break;
     for (const row of page.rows) {
+      const data = table === 'orders' ? JSON.stringify({ discount: 0, ...JSON.parse(row.data) }) : row.data;
       await target.query(
-        `INSERT INTO ${table}${override} SELECT * FROM json_populate_record(NULL::${table}, $1::json)`, [row.data]
+        `INSERT INTO ${table}${override} SELECT * FROM json_populate_record(NULL::${table}, $1::json)`, [data]
       );
     }
     count += page.rows.length;

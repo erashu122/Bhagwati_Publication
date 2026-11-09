@@ -5,6 +5,7 @@ import { BookCover } from '../components/BookCover';
 import { BookCard, BrowseLink } from '../components/Storefront';
 import { canOrder, formatPrice, readingPreviewKinds } from '../data/books';
 import { useCatalog } from '../catalog';
+import { WishlistButton } from '../customer-extras';
 import { matchesAuthor } from '../../../shared/content';
 import { AuthorPortrait } from '../components/AuthorPortrait';
 
@@ -121,6 +122,7 @@ export function BookDetails({ add }: AddBook) {
           <div><strong>{formatPrice(book.price)}</strong><small>Listed price</small></div>
           <button type="button" className="button primary" onClick={() => add(book.id)}><ShoppingBag size={18} aria-hidden="true" /> Add to bag</button>
         </div>}
+        <WishlistButton id={book.id} title={book.title} />
         <p className="small-note">Final editions, pricing and availability are pending publisher confirmation.</p>
       </div>
     </section>

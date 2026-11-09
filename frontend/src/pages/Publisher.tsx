@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, BookOpen, ClipboardList, FileText, LayoutDashboard, Mail, RefreshCw, ShieldCheck, Tags, UserRound } from 'lucide-react';
+import { ArrowUpRight, Bell, BookOpen, ClipboardList, FileText, LayoutDashboard, Mail, RefreshCw, ShieldCheck, Tag, Tags, UserRound } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { nextOrderStatuses, orderStatusLabels } from '../../../shared/store';
 import type { Enquiry, Order, OrderStatus, StoreOrder } from '../../../shared/store';
@@ -7,6 +7,7 @@ import { errorMessage, storeRequest, useAccount } from '../account';
 import { OrderCard, orderReference } from '../components/OrderCard';
 import { CatalogAdmin } from './CatalogAdmin';
 import { AdminOverview } from './AdminOverview';
+import { PublisherAnnouncements, PublisherCoupons } from './PublisherUpdates';
 
 type PublisherData = { orders: StoreOrder[]; enquiries: Enquiry[] };
 const sections = [
@@ -16,6 +17,8 @@ const sections = [
   { id: 'author', label: 'Author profile', icon: UserRound },
   { id: 'content', label: 'Store content', icon: FileText },
   { id: 'orders', label: 'Orders', icon: ClipboardList },
+  { id: 'coupons', label: 'Coupons', icon: Tag },
+  { id: 'announcements', label: 'Announcements', icon: Bell },
   { id: 'enquiries', label: 'Enquiries', icon: Mail }
 ] as const;
 
@@ -115,6 +118,8 @@ export function Publisher() {
       </aside>
       <section className="admin-content" aria-label="Admin workspace">
         {section === 'overview' ? <AdminOverview />
+          : section === 'coupons' ? <PublisherCoupons />
+          : section === 'announcements' ? <PublisherAnnouncements />
           : section === 'orders' || section === 'enquiries' ? <Operations key={section + status} enquiries={section === 'enquiries'} initialStatus={status} />
           : <CatalogAdmin key={section + stock + action} section={section} startAdding={action === 'add'} lowStock={stock === 'low'} />}
       </section>

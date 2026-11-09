@@ -38,16 +38,21 @@ export function passwordField(value: unknown, registering: boolean) {
   return value;
 }
 
+export function phoneField(value: unknown) {
+  const phone = field(value, 'phone number', 15).replace(/[ -]/g, '');
+  if (!/^(?:\+91)?[6-9][0-9]{9}$/.test(phone)) throw new RequestError(400, 'Enter a valid Indian mobile number.');
+  return phone.startsWith('+91') ? phone : '+91' + phone;
+}
+
 export function addressField(value: unknown): Address {
   const input = record(value);
-  const phone = field(input.phone, 'phone number', 15).replace(/[ -]/g, '');
   const pin = field(input.pin, 'PIN code', 6);
-  if (!/^(?:\+91)?[6-9][0-9]{9}$/.test(phone) || !/^[1-9][0-9]{5}$/.test(pin)) {
-    throw new RequestError(400, 'Enter a valid Indian mobile number and six-digit PIN code.');
+  if (!/^[1-9][0-9]{5}$/.test(pin)) {
+    throw new RequestError(400, 'Enter a valid six-digit Indian PIN code.');
   }
   return {
     fullName: field(input.fullName, 'recipient name', 100),
-    phone: phone.startsWith('+91') ? phone : '+91' + phone,
+    phone: phoneField(input.phone),
     street: field(input.street, 'street address', 240),
     city: field(input.city, 'city', 100),
     state: field(input.state, 'state or union territory', 100),

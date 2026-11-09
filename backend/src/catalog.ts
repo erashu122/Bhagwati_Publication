@@ -7,6 +7,7 @@ import type { Book, Category } from '../../shared/books.ts';
 import { contentFields } from '../../shared/content.ts';
 import type { ContentRecord, StoreContent } from '../../shared/content.ts';
 import { field, record, RequestError } from './validation.ts';
+import { notifyBook } from './customer-features.ts';
 
 const bookIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -183,6 +184,7 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
     await db.transaction(async tx => {
       const result = await tx.query('SELECT id FROM categories WHERE id = $1 FOR KEY SHARE', [category]);
       if (!result.rows.length) throw new RequestError(400, 'Choose an existing category.');
+      const previous = editing && (await tx.query<{ published: boolean }>('SELECT published FROM books WHERE id = $1 FOR UPDATE', [id])).rows[0];
       if (editing) {
         const { rows } = await tx.query(`
           UPDATE books SET category_id=$2, title=$3, author=$4, format=$5, language=$6, description=$7,
@@ -199,6 +201,7 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         `, [...params, preview ?? '', previewKind ?? 'overview']);
       }
+      if (body.published && (!previous || !previous.published)) await notifyBook(tx, id, title);
       if (cover === null) await tx.query('DELETE FROM book_covers WHERE book_id = $1', [id]);
       if (cover) {
         await tx.query(`
@@ -217,11 +220,15 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
     const id = bookId(request.params.id);
     const body = record(request.body);
     if (typeof body.published !== 'boolean') throw new RequestError(400, 'Choose book visibility.');
-    const { rows } = await db.query(
-      'UPDATE books SET published=$2, revision=revision+1, updated_at=NOW() WHERE id=$1 AND revision=$3 RETURNING id',
-      [id, body.published, positiveInteger(body.revision, 'revision')]
-    );
-    if (!rows.length) throw stale();
+    await db.transaction(async tx => {
+      const { rows: [previous] } = await tx.query<{ published: boolean; title: string }>(
+        'SELECT published, title FROM books WHERE id=$1 AND revision=$2 FOR UPDATE',
+        [id, positiveInteger(body.revision, 'revision')]
+      );
+      if (!previous) throw stale();
+      await tx.query('UPDATE books SET published=$2, revision=revision+1, updated_at=NOW() WHERE id=$1', [id, body.published]);
+      if (body.published && !previous.published) await notifyBook(tx, id, previous.title);
+    });
     response.json({ id });
   });
 

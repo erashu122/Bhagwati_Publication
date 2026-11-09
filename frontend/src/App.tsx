@@ -15,6 +15,8 @@ import { Author } from './pages/Author';
 import { About, Contact, NotFound, Policy } from './pages/Information';
 import { Dashboard, ResetAdminPassword, SignIn } from './pages/Account';
 import { Publisher } from './pages/Publisher';
+import { CustomerExtrasProvider, NotificationBell, NotificationList, useCustomerExtras } from './customer-extras';
+import { StoreChat } from './components/StoreChat';
 
 const navLinks = [['/', 'Home'], ['/books', 'All Books'], ['/about', 'Our Story'], ['/contact', 'Contact']];
 
@@ -58,7 +60,8 @@ function Header({ count }: { count: number }) {
           {navLinks.map(([path, name]) => <NavLink key={path} to={path} end={path === '/'} onClick={() => setMenuOpen(false)}>{name}</NavLink>)}
         </nav>
         <div className="header-actions">
-          <Link className="icon-button" to="/books" aria-label="Search books"><Search size={21} strokeWidth={1.6} aria-hidden="true" /></Link>
+          <Link className="icon-button header-search" to="/books" aria-label="Search books"><Search size={21} strokeWidth={1.6} aria-hidden="true" /></Link>
+          <NotificationBell />
           <NavLink className="icon-button account-link" to={customer ? '/account' : '/login'} aria-label={customer ? 'My account' : 'Sign in'}><UserRound size={21} strokeWidth={1.6} aria-hidden="true" /></NavLink>
           <Link className="icon-button bag-link" to="/cart" aria-label={'Book bag, ' + count + (count === 1 ? ' copy' : ' copies')}>
             <ShoppingBag size={21} strokeWidth={1.6} aria-hidden="true" /><span className="bag-count" aria-hidden="true">{count}</span>
@@ -84,7 +87,7 @@ function Footer() {
 }
 
 export function App() {
-  return <AccountProvider><CatalogProvider><Storefront /></CatalogProvider></AccountProvider>;
+  return <AccountProvider><CatalogProvider><CustomerExtrasProvider><Storefront /></CustomerExtrasProvider></CatalogProvider></AccountProvider>;
 }
 
 function Storefront() {
@@ -92,6 +95,7 @@ function Storefront() {
   const { customer } = useAccount();
   const { booksById } = useCatalog();
   const { pathname } = useLocation();
+  const { refreshNotifications } = useCustomerExtras();
 
   useEffect(() => {
     try {
@@ -117,7 +121,10 @@ function Storefront() {
   };
   const change = (id: string, quantity: number) => dispatch({ type: 'set', id, quantity });
   const count = Object.values(cart).reduce((total, quantity) => total + quantity, 0);
-  const checkout = <Checkout cart={cart} complete={order => dispatch({ type: 'order', order })} />;
+  const checkout = <Checkout cart={cart} complete={order => {
+    dispatch({ type: 'order', order });
+    refreshNotifications();
+  }} />;
 
   return <>
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
@@ -134,6 +141,9 @@ function Storefront() {
         <Route path="/forgot-password" element={<ResetAdminPassword />} />
         <Route path="/register" element={<SignIn key="register" register />} />
         <Route path="/account" element={<RequireAccount>{customer && <Dashboard key={customer.id} customer={customer} cartCount={count} />}</RequireAccount>} />
+        <Route path="/notifications" element={<section className="container section page-content">
+          <p className="eyebrow"><span className="diamond" /> YOUR BOOKSHOP</p><h1>Store updates</h1><NotificationList />
+        </section>} />
         <Route path="/publisher" element={<RequireAccount operator><Publisher /></RequireAccount>} />
         <Route path="/admin" element={<RequireAccount operator><Publisher /></RequireAccount>} />
         <Route path="/about" element={<CatalogReady><About /></CatalogReady>} />
@@ -143,6 +153,7 @@ function Storefront() {
       </Routes>
     </main>
     <Footer />
+    <StoreChat />
     <div className="toast-region" role="status" aria-atomic="true">
       {toast && <div className="toast"><Check size={18} aria-hidden="true" /><span>{toast.message}</span><button type="button" className="icon-button" aria-label="Dismiss notification" onClick={() => dispatch({ type: 'dismiss' })}><X size={17} aria-hidden="true" /></button></div>}
     </div>

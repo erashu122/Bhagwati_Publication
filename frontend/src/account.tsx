@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import type { Customer } from '../../shared/store';
 
 export class StoreError extends Error {
@@ -79,8 +79,10 @@ export function AccountLoading() {
 
 export function RequireAccount({ children, checkout = false, operator = false }: { children: ReactNode; checkout?: boolean; operator?: boolean }) {
   const { customer, loading, error } = useAccount();
+  const location = useLocation();
+  const tab = location.pathname === '/account' && new URLSearchParams(location.search).get('tab');
   if (loading || error) return <AccountLoading />;
-  if (!customer) return <Navigate replace to={checkout ? '/register?next=checkout' : operator ? '/login?next=admin' : '/login'} />;
+  if (!customer) return <Navigate replace to={checkout ? '/register?next=checkout' : operator ? '/login?next=admin' : tab ? '/login?tab=' + encodeURIComponent(tab) : '/login'} />;
   if (operator && !customer.operator) return <div className="container section"><div className="empty-panel">
     <h1>Publisher access required</h1><Link className="button primary" to="/account">My account</Link>
   </div></div>;

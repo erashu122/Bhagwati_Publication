@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArrowRight, BookOpen, Minus, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { Order } from '../../../shared/store';
+import { couponDiscount } from '../../../shared/store';
+import type { Coupon, Order } from '../../../shared/store';
 import { errorMessage, StoreError, storeRequest, useAccount } from '../account';
 import { AddressFields, readAddress } from '../components/AddressFields';
 import { cartItems, maxQuantity } from '../cart';
@@ -12,14 +13,20 @@ import { BookCover } from '../components/BookCover';
 import { EmptyBag } from '../components/Storefront';
 import { canOrder, formatPrice } from '../data/books';
 
-function OrderSummary({ items, checkout = false, needsShipping = true, blocked = false }: { items: ReturnType<typeof cartItems>; checkout?: boolean; needsShipping?: boolean; blocked?: boolean }) {
+function OrderSummary({ items, checkout = false, needsShipping = true, blocked = false, coupon }: {
+  items: ReturnType<typeof cartItems>; checkout?: boolean; needsShipping?: boolean; blocked?: boolean; coupon?: Coupon;
+}) {
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const discount = coupon ? couponDiscount(subtotal, coupon.percent) : 0;
   return <aside className="order-summary">
     <h2>Order summary</h2>
     {checkout && <ul className="summary-items">{items.map(({ book, quantity, total }) => <li key={book.id}>
       <span lang={book.language === 'Hindi' ? 'hi' : 'en'}>{book.title} × {quantity}</span><span>{formatPrice(total)}</span>
     </li>)}</ul>}
-    <dl><div><dt>Estimated book subtotal</dt><dd>{formatPrice(subtotal)}</dd></div><div><dt>Shipping</dt><dd>{!needsShipping ? 'Not required' : 'Pending confirmation'}</dd></div>
+    <dl><div><dt>Estimated book subtotal</dt><dd>{formatPrice(subtotal)}</dd></div>
+    {coupon && <><div><dt>{coupon.code} ({coupon.percent}% off)</dt><dd>−{formatPrice(discount)}</dd></div>
+      <div><dt>After discount</dt><dd>{formatPrice(subtotal - discount)}</dd></div></>}
+    <div><dt>Shipping</dt><dd>{!needsShipping ? 'Not required' : 'Pending confirmation'}</dd></div>
     {checkout && <div><dt>Tax</dt><dd>Pending confirmation</dd></div>}</dl>
     {!checkout && (blocked ? <p className="small-note checkout-note">Review the items in your bag before continuing.</p> : <Link className="button primary" to="/checkout">Continue to checkout <ArrowRight size={17} aria-hidden="true" /></Link>)}
   </aside>;
@@ -87,7 +94,25 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [selectedCode, setSelectedCode] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [reloadCoupons, setReloadCoupons] = useState(0);
+  const activeCoupon = coupons.find(coupon => coupon.code === selectedCode);
   const needsShipping = items.some(item => item.book.format !== 'eBook');
+  const customerId = customer?.id;
+
+  useEffect(() => {
+    if (!customerId) return;
+    let current = true;
+    setCouponError('');
+    storeRequest<{ coupons: Coupon[] }>('/coupons').then(result => {
+      if (!current) return;
+      setCoupons(result.coupons);
+      setSelectedCode(code => result.coupons.some(coupon => coupon.code === code) ? code : '');
+    }).catch(error => { if (current) setCouponError(errorMessage(error)); });
+    return () => { current = false; };
+  }, [customerId, reloadCoupons]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,7 +129,8 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
         quote: Object.fromEntries(items.map(({ book }) => [book.id, `${book.price}:${book.format}`])),
         requestKey: request.current.key,
         address: needsShipping ? readAddress(form) : null,
-        saveAddress
+        saveAddress,
+        coupon: activeCoupon && { code: activeCoupon.code, percent: activeCoupon.percent }
       });
       try {
         sessionStorage.removeItem('bhagwati.checkout.' + customer.id);
@@ -118,7 +144,10 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
       if (error instanceof StoreError && error.status === 401) setCustomer(null);
       else {
         setError(errorMessage(error));
-        if (error instanceof StoreError && error.status === 409) await refresh();
+        if (error instanceof StoreError && error.status === 409) {
+          setReloadCoupons(value => value + 1);
+          await refresh();
+        }
       }
     } finally {
       sending.current = false;
@@ -138,14 +167,22 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
           <h2>Contact</h2><p className="checkout-email"><strong>{customer.fullName}</strong><span>{customer.email}</span></p>
           {needsShipping ? <>
             <h2 className="delivery-heading">Delivery address</h2>
-            <AddressFields address={customer.address} fullName={customer.fullName} />
+            <AddressFields address={customer.address} fullName={customer.fullName} phone={customer.phone} />
             <label className="checkbox-field"><input name="saveAddress" type="checkbox" /> Save this as my default delivery address</label>
           </> : <p className="digital-note"><BookOpen size={18} aria-hidden="true" /> Your bag contains eBooks only. A shipping address is unnecessary.</p>}
-          <p className="checkout-note">The publisher will confirm availability and final charges before fulfillment. No payment is collected here.</p>
+          <h2 className="delivery-heading">Coupons &amp; payment</h2>
+          <label className="field">Apply a coupon
+            <select value={selectedCode} disabled={busy || !coupons.length} onChange={event => setSelectedCode(event.target.value)}>
+              <option value="">{coupons.length ? 'No coupon' : 'No active coupons'}</option>
+              {coupons.map(coupon => <option key={coupon.code} value={coupon.code}>{coupon.code} · {coupon.percent}% off books</option>)}
+            </select>
+          </label>
+          {couponError && <p className="form-error" role="alert">{couponError} <button className="text-link" type="button" onClick={() => setReloadCoupons(value => value + 1)}>Retry coupons</button></p>}
+          <p className="checkout-note">The publisher will confirm availability, final charges and payment instructions. No payment is collected here.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button primary" disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit order request'} <ArrowRight size={17} aria-hidden="true" /></button>
         </form>
-        <OrderSummary items={items} checkout needsShipping={needsShipping} />
+        <OrderSummary items={items} checkout needsShipping={needsShipping} coupon={activeCoupon} />
       </div>
     </>}
   </section>;

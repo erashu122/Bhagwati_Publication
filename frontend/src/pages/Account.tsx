@@ -1,14 +1,15 @@
 import { useEffect, useId, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, Eye, EyeOff, LayoutGrid, LogOut, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from 'lucide-react';
+import { ArrowRight, Bell, BookOpen, CheckCircle2, Eye, EyeOff, Heart, LayoutGrid, LogOut, MapPin, Package, ShieldCheck, ShoppingBag, Tag, UserRound, Wallet } from 'lucide-react';
 import { Link, Navigate, useNavigate, useSearchParams, createSearchParams } from 'react-router-dom';
 import type { Customer, Order } from '../../../shared/store';
 import { AccountLoading, errorMessage, StoreError, storeRequest, useAccount } from '../account';
-import { AddressFields, readAddress } from '../components/AddressFields';
+import { AddressFields, indianMobilePattern, readAddress } from '../components/AddressFields';
 import { BookCover } from '../components/BookCover';
 import { OrderCard, orderReference } from '../components/OrderCard';
 import { BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
+import { Coupons, NotificationList, Wishlist } from '../customer-extras';
 
 function PasswordField({ label = 'Password', name = 'password', create = false }: {
   label?: string;
@@ -40,8 +41,11 @@ export function SignIn({ register }: { register: boolean }) {
   const [busy, setBusy] = useState(false);
   const fromCheckout = params.get('next') === 'checkout';
   const fromAdmin = params.get('next') === 'admin';
+  const fromNotifications = params.get('next') === 'notifications';
+  const nextTab = accountTabs.find(tab => tab.id === params.get('tab'))?.id;
+  const authSwitchQuery = fromCheckout ? '?next=checkout' : fromNotifications ? '?next=notifications' : nextTab ? '?tab=' + nextTab : '';
   const destination = (account: Customer) => fromCheckout ? '/account?next=checkout'
-    : account.operator ? '/admin' : '/account';
+    : fromNotifications ? '/notifications' : nextTab ? '/account?tab=' + nextTab : account.operator ? '/admin' : '/account';
 
   if (loading || sessionError) return <AccountLoading />;
   if (customer) return <Navigate replace to={destination(customer)} />;
@@ -88,7 +92,7 @@ export function SignIn({ register }: { register: boolean }) {
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Please wait…' : register ? 'Create account' : 'Sign in'} <ArrowRight size={17} aria-hidden="true" /></button>
       </form>
       <p className="auth-switch">{register ? 'Already have an account?' : 'New to Bhagwati Publication?'}{' '}
-        <Link className="text-link" to={(register ? '/login' : '/register') + (fromCheckout ? '?next=checkout' : '')}>{register ? 'Sign in' : 'Create an account'}</Link>
+        <Link className="text-link" to={(register ? '/login' : '/register') + authSwitchQuery}>{register ? 'Sign in' : 'Create an account'}</Link>
       </p>
     </div>
   </section>;
@@ -188,21 +192,24 @@ function ProfileEditor({ customer }: { customer: Customer }) {
       <h2><UserRound size={20} aria-hidden="true" /> Profile details</h2>
       <form className="form-stack" onSubmit={event => {
         event.preventDefault();
-        void update('/profile', { fullName: new FormData(event.currentTarget).get('fullName') }, 'Your profile was updated.');
+        const form = new FormData(event.currentTarget);
+        void update('/profile', { fullName: form.get('fullName'), phone: form.get('phone') }, 'Your profile was updated.');
       }}>
         <label className="field">Full name<input name="fullName" required maxLength={100} autoComplete="name" defaultValue={customer.fullName} /></label>
         <label className="field">Account email<input readOnly value={customer.email} /></label>
+        <label className="field">Mobile number<input name="phone" type="tel" maxLength={15} autoComplete="tel" pattern={indianMobilePattern}
+          title="Use a 10-digit Indian mobile number, optionally with +91." defaultValue={customer.phone ?? ''} /></label>
         <button className="button secondary" disabled={busy} type="submit">Save profile</button>
       </form>
     </section>
     <section className="form-panel profile-panel">
       <h2><MapPin size={20} aria-hidden="true" /> Default delivery address</h2>
       <p className="small-note">Use this address to fill in delivery details at checkout.</p>
-      <form key={JSON.stringify(customer.address)} className="form-stack" onSubmit={event => {
+      <form key={JSON.stringify([customer.address, customer.phone, customer.fullName])} className="form-stack" onSubmit={event => {
         event.preventDefault();
         void update('/address', { address: readAddress(new FormData(event.currentTarget)) }, 'Your delivery address was saved.');
       }}>
-        <AddressFields address={customer.address} fullName={customer.fullName} />
+        <AddressFields address={customer.address} fullName={customer.fullName} phone={customer.phone} />
         <div className="inline-actions">
           <button className="button primary" disabled={busy} type="submit">Save address</button>
           {customer.address && <button className="button secondary" disabled={busy} type="button" onClick={() => void update('/address', { address: null }, 'Your default delivery address was removed.')}>Remove saved address</button>}
@@ -214,6 +221,57 @@ function ProfileEditor({ customer }: { customer: Customer }) {
   </div>;
 }
 
+function PaymentDetails({ customer }: { customer: Customer }) {
+  const { setCustomer } = useAccount();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function save(upiId: FormDataEntryValue | null) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await storeRequest<{ customer: Customer }>('/payment-details', 'PATCH', { upiId });
+      setCustomer(result.customer);
+      setMessage(result.customer.upiId ? 'UPI ID saved.' : 'UPI ID removed.');
+    } catch (error) {
+      if (error instanceof StoreError && error.status === 401) setCustomer(null);
+      else setError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="form-panel feature-stack">
+    <h2><Wallet size={20} aria-hidden="true" /> Payment details</h2>
+    <p className="small-note">Save a private UPI ID for your records. Payment is arranged after the publisher confirms your order.</p>
+    <form key={customer.upiId} className="form-stack" onSubmit={event => {
+      event.preventDefault();
+      void save(new FormData(event.currentTarget).get('upiId'));
+    }}>
+      <label className="field">UPI ID<input name="upiId" required type="text" maxLength={100} defaultValue={customer.upiId ?? ''}
+        placeholder="name@provider" autoComplete="off" autoCapitalize="none" spellCheck={false} /></label>
+      <div className="inline-actions">
+        <button type="submit" className="button primary" disabled={busy}>Save UPI ID</button>
+        {customer.upiId && <button type="button" className="button secondary" disabled={busy} onClick={() => void save(null)}>Remove UPI ID</button>}
+      </div>
+    </form>
+    {message && <p className="feedback" role="status">{message}</p>}
+    {error && <p className="form-error" role="alert">{error}</p>}
+  </section>;
+}
+
+const accountTabs = [
+  { id: 'overview', label: 'Overview', icon: LayoutGrid },
+  { id: 'orders', label: 'My orders', icon: Package },
+  { id: 'profile', label: 'Profile & address', icon: UserRound },
+  { id: 'wishlist', label: 'Wishlist', icon: Heart },
+  { id: 'coupons', label: 'Coupons', icon: Tag },
+  { id: 'payment', label: 'Payments & UPI', icon: Wallet },
+  { id: 'notifications', label: 'Notifications', icon: Bell }
+] as const;
+
 export function Dashboard({ customer, cartCount }: { customer: Customer; cartCount: number }) {
   const { setCustomer } = useAccount();
   const [params] = useSearchParams();
@@ -222,11 +280,13 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
   const [logoutError, setLogoutError] = useState('');
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [reload, setReload] = useState(0);
-  const tab = params.get('tab') === 'profile' ? 'profile'
-    : params.get('tab') === 'orders' || params.has('order') ? 'orders' : 'overview';
+  const tab = params.has('order') ? 'orders' : accountTabs.find(tab => tab.id === params.get('tab'))?.id ?? 'overview';
   const justPlaced = orders?.find(order => order.id === params.get('order'));
+  const viewedOrder = params.get('view');
+  const displayedOrders = tab === 'overview' ? orders?.slice(0, 1)
+    : viewedOrder ? orders?.filter(order => order.id === viewedOrder) : orders;
   const fromCheckout = params.get('next') === 'checkout';
-  const accountPage = (page: 'overview' | 'orders' | 'profile') => {
+  const accountPage = (page: typeof accountTabs[number]['id']) => {
     const search = createSearchParams();
     if (page !== 'overview') search.set('tab', page);
     if (fromCheckout) search.set('next', 'checkout');
@@ -236,6 +296,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
   useEffect(() => {
     let current = true;
     setOrderError('');
+    if (tab !== 'overview' && tab !== 'orders') return;
     storeRequest<{ orders: Order[] }>('/orders').then(result => {
       if (current) setOrders(result.orders);
     }).catch(error => {
@@ -244,7 +305,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
       else setOrderError(errorMessage(error));
     });
     return () => { current = false; };
-  }, [customer.id, reload, setCustomer]);
+  }, [customer.id, tab, reload, setCustomer]);
 
   async function logout() {
     setLogoutBusy(true);
@@ -281,9 +342,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
         <Link to={accountPage('profile')}><span className="dashboard-icon"><MapPin size={21} aria-hidden="true" /></span><span><small>Delivery address</small><strong>{customer.address ? 'Saved' : 'Add an address'}</strong></span><ArrowRight className="dashboard-arrow" size={17} aria-hidden="true" /></Link>
       </div>
       <nav className="dashboard-nav" aria-label="Account navigation">
-        <Link to={accountPage('overview')} aria-current={tab === 'overview' ? 'page' : undefined}><LayoutGrid size={17} aria-hidden="true" /> Overview</Link>
-        <Link to={accountPage('orders')} aria-current={tab === 'orders' ? 'page' : undefined}><Package size={17} aria-hidden="true" /> My orders</Link>
-        <Link to={accountPage('profile')} aria-current={tab === 'profile' ? 'page' : undefined}><UserRound size={17} aria-hidden="true" /> Profile &amp; address</Link>
+        {accountTabs.map(({ id, label, icon: Icon }) => <Link key={id} to={accountPage(id)} aria-current={tab === id ? 'page' : undefined}><Icon size={17} aria-hidden="true" /> {label}</Link>)}
         {customer.operator && <Link to="/admin"><ShieldCheck size={17} aria-hidden="true" /> Admin dashboard</Link>}
       </nav>
       {tab === 'overview' && <section className="dashboard-callout">
@@ -291,15 +350,20 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
           <p>{cartCount ? 'Review the books in your bag whenever you’re ready.' : 'Explore a new title and read a preview before adding it to your bag.'}</p></div>
         {cartCount ? <Link className="button primary" to="/cart">View book bag <ArrowRight size={17} aria-hidden="true" /></Link> : <BrowseLink>Browse books</BrowseLink>}
       </section>}
-      {tab === 'profile' ? <ProfileEditor customer={customer} /> : <>
+      {tab === 'profile' && <ProfileEditor customer={customer} />}
+      {tab === 'payment' && <PaymentDetails customer={customer} />}
+      {tab === 'wishlist' && <Wishlist />}
+      {tab === 'coupons' && <Coupons />}
+      {tab === 'notifications' && <NotificationList />}
+      {(tab === 'overview' || tab === 'orders') && <>
         <div className="section-heading">
           <div><h2>{tab === 'orders' ? 'My orders' : 'Latest order'}</h2><p>View order details and track the current status.</p></div>
-          {tab === 'overview' && !!orders?.length && <Link className="text-link" to={accountPage('orders')}>View all orders <ArrowRight size={17} aria-hidden="true" /></Link>}
+          {(viewedOrder || tab === 'overview' && !!orders?.length) && <Link className="text-link" to={accountPage('orders')}>View all orders <ArrowRight size={17} aria-hidden="true" /></Link>}
         </div>
         {orderError ? <div className="empty-panel"><p role="alert">{orderError}</p><button className="button primary" type="button" onClick={() => setReload(value => value + 1)}>Try again</button></div>
           : orders === null ? <p role="status">Loading your orders…</p>
-          : orders.length === 0 ? <div className="empty-panel"><Package size={32} aria-hidden="true" /><h2>No orders yet</h2><p>Your order requests will appear here.</p></div>
-          : <div className="account-orders">{(tab === 'overview' ? orders.slice(0, 1) : orders).map(order => <OrderCard key={order.id} order={order} />)}</div>}
+          : !displayedOrders?.length ? <div className="empty-panel"><Package size={32} aria-hidden="true" /><h2>{viewedOrder ? 'Order unavailable' : 'No orders yet'}</h2><p>Your order requests will appear here.</p></div>
+          : <div className="account-orders">{displayedOrders.map(order => <OrderCard key={order.id} order={order} />)}</div>}
       </>}
     </section>
   </>;

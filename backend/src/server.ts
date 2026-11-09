@@ -5,15 +5,16 @@ import { resolve } from 'node:path';
 import express from 'express';
 import type { ErrorRequestHandler, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { nextOrderStatuses } from '../../shared/store.ts';
-import type { Customer, Enquiry, Order, OrderStatus, PublisherOverview, StoreOrder } from '../../shared/store.ts';
+import { couponDiscount, nextOrderStatuses, orderStatusLabels } from '../../shared/store.ts';
+import type { Coupon, Customer, Enquiry, Order, OrderStatus, PublisherOverview, StoreOrder } from '../../shared/store.ts';
 import type { Book } from '../../shared/books.ts';
 import { canOrder } from '../../shared/books.ts';
 import { catalogRouter } from './catalog.ts';
 import { emailAdminRecovery } from './admin-recovery.ts';
+import { couponCode, customerFeatures, notifyOrder } from './customer-features.ts';
 import { openDatabase } from './database.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
-import { addressField, cartEntries, emailField, field, passwordField, record, RequestError, uuidField } from './validation.ts';
+import { addressField, cartEntries, emailField, field, passwordField, phoneField, record, RequestError, uuidField } from './validation.ts';
 
 const onVercel = process.env.VERCEL === '1';
 const development = !onVercel && process.argv.includes('--dev');
@@ -27,8 +28,8 @@ const db = await openDatabase();
 const app = express();
 const api = express.Router();
 
-const customerFields = 'id, email, full_name AS "fullName", address, operator';
-const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", address';
+const customerFields = 'id, email, full_name AS "fullName", phone, upi_id AS "upiId", address, operator';
+const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address';
 
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
@@ -51,6 +52,7 @@ api.use((request, response, next) => {
 });
 api.use(catalogRouter(db, request => requireCustomer(request, true)));
 api.use(express.json({ limit: '24kb' }));
+api.use(customerFeatures(db, signedInCustomer, requireCustomer));
 
 const authLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -80,7 +82,7 @@ async function signedInCustomer(request: Request): Promise<Customer | null> {
   const token = sessionToken(request);
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
   const result = await db.query<Customer>(
-    `SELECT c.id, c.email, c.full_name AS "fullName", c.address, c.operator
+    `SELECT c.id, c.email, c.full_name AS "fullName", c.phone, c.upi_id AS "upiId", c.address, c.operator
        FROM sessions s JOIN customers c ON c.id = s.customer_id
       WHERE s.token_hash = $1 AND s.expires_at > NOW()`, [digest(token)]
   );
@@ -196,10 +198,25 @@ api.patch('/profile', async (request, response) => {
   const customer = await requireCustomer(request);
   const body = record(request.body);
   const name = field(body.fullName, 'full name', 100);
+  const phone = body.phone === undefined ? customer.phone
+    : body.phone === '' || body.phone === null ? null : phoneField(body.phone);
   const result = await db.query<Customer>(
-    `UPDATE customers SET full_name = $2 WHERE id = $1 RETURNING ${customerFields}`, [customer.id, name]
+    `UPDATE customers SET full_name = $2, phone = $3 WHERE id = $1 RETURNING ${customerFields}`, [customer.id, name, phone]
   );
   response.json({ customer: result.rows[0] });
+});
+
+api.patch('/payment-details', async (request, response) => {
+  const customer = await requireCustomer(request);
+  const { upiId } = record(request.body);
+  const upi = upiId === null || upiId === '' ? null : field(upiId, 'UPI ID', 100);
+  if (upi !== null && !/^[a-z0-9][a-z0-9._-]*@[a-z0-9][a-z0-9.-]*$/i.test(upi)) {
+    throw new RequestError(400, 'Enter a UPI ID like name@provider.');
+  }
+  const { rows } = await db.query<Customer>(
+    `UPDATE customers SET upi_id = $2 WHERE id = $1 RETURNING ${customerFields}`, [customer.id, upi]
+  );
+  response.json({ customer: rows[0] });
 });
 
 api.patch('/address', async (request, response) => {
@@ -225,10 +242,15 @@ api.post('/orders', async (request, response) => {
   const body = record(request.body);
   const key = uuidField(body.requestKey);
   const entries = cartEntries(body.cart);
+  const coupon = body.coupon == null ? null : record(body.coupon);
+  const code = coupon && couponCode(coupon.code);
+  const percent = coupon?.percent;
   function delivery(needsShipping: boolean) {
     const address = needsShipping ? addressField(body.address) : null;
     const saveAddress = address !== null && body.saveAddress === true;
-    const requestHash = digest(JSON.stringify({ items: entries, address, saveAddress }));
+    const requestHash = digest(JSON.stringify({
+      items: entries, address, saveAddress, ...(code && { coupon: { code, percent } })
+    }));
     return { address, saveAddress, requestHash };
   }
   const order = await db.transaction(async tx => {
@@ -263,13 +285,22 @@ api.post('/orders', async (request, response) => {
     });
     const { address, saveAddress, requestHash } = delivery(lines.some(line => line.format !== 'eBook'));
     const subtotal = lines.reduce((total, line) => total + line.unitPrice * line.quantity, 0);
+    let discount = 0;
+    if (code) {
+      const { rows: [current] } = await tx.query<Coupon>('SELECT percent, active FROM coupons WHERE code = $1 FOR SHARE', [code]);
+      if (!current?.active || current.percent !== percent) {
+        throw new RequestError(409, 'This coupon changed or is unavailable. Review your coupon before submitting again.');
+      }
+      discount = couponDiscount(subtotal, current.percent);
+    }
     const inserted = await tx.query<Order>(
-      `INSERT INTO orders (id, customer_id, request_key, request_hash, lines, subtotal, address)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO orders (id, customer_id, request_key, request_hash, lines, subtotal, address, coupon_code, discount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING ${orderFields}`,
-      [randomUUID(), customer.id, key, requestHash, JSON.stringify(lines), subtotal, address && JSON.stringify(address)]
+      [randomUUID(), customer.id, key, requestHash, JSON.stringify(lines), subtotal, address && JSON.stringify(address), code, discount]
     );
     if (saveAddress) await tx.query('UPDATE customers SET address = $2 WHERE id = $1', [customer.id, JSON.stringify(address)]);
+    await notifyOrder(tx, customer.id, inserted.rows[0].id, 'Order request received', 'The publisher will review your order request.');
     return inserted.rows[0];
   });
   response.status(201).json({ order });
@@ -310,7 +341,7 @@ api.get('/publisher', async (request, response) => {
   await requireCustomer(request, true);
   const orders = await db.query<StoreOrder>(
     `SELECT o.id, o.status, o.created_at AS "createdAt", o.lines, o.subtotal AS "estimatedSubtotal",
-            o.address, c.email, c.full_name AS "fullName"
+            o.address, o.coupon_code AS "couponCode", o.discount, c.email, c.full_name AS "fullName"
        FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.created_at DESC`
   );
   const enquiries = await db.query<Enquiry>(
@@ -324,13 +355,13 @@ api.patch('/publisher/orders/:id', async (request, response) => {
   const id = uuidField(request.params.id);
   const { status } = record(request.body);
   const updated = await db.transaction(async tx => {
-    const result = await tx.query<Order & { reserved_inventory: { id: string; quantity: number }[] | null }>(
-      `SELECT ${orderFields}, reserved_inventory FROM orders WHERE id = $1 FOR UPDATE`, [id]
+    const result = await tx.query<Order & { customer_id: string; reserved_inventory: { id: string; quantity: number }[] | null }>(
+      `SELECT ${orderFields}, customer_id, reserved_inventory FROM orders WHERE id = $1 FOR UPDATE`, [id]
     );
     const order = result.rows[0];
     if (!order) throw new RequestError(404, 'Order not found.');
     if (status === order.status) {
-      const { reserved_inventory: _reserved, ...current } = order;
+      const { reserved_inventory: _reserved, customer_id: _customerId, ...current } = order;
       return current;
     }
     if (!nextOrderStatuses(order).includes(status as OrderStatus)) {
@@ -355,6 +386,7 @@ api.patch('/publisher/orders/:id', async (request, response) => {
       `UPDATE orders SET status = $2, reserved_inventory = $3 WHERE id = $1 RETURNING ${orderFields}`,
       [id, status, JSON.stringify(reserved)]
     );
+    await notifyOrder(tx, order.customer_id, id, 'Order update', 'Status: ' + orderStatusLabels[changed.rows[0].status]);
     return changed.rows[0];
   });
   response.json({ order: updated });

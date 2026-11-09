@@ -20,6 +20,30 @@ To recover the `admin` sign-in, point the operator command at the store's databa
 
 To enable **Email me a code**, set `ADMIN_RECOVERY_EMAIL` to the owner's address and `RESEND_API_KEY` to a sending key. Set `ADMIN_RECOVERY_FROM` to a verified sender if sending outside the Resend account's own address. The default Resend test sender can send only to the address registered with Resend. Keep these settings in the server environment.
 
+### Recover the live admin without email
+
+Open the SQL editor for the Neon database used by the production Vercel deployment. Turn off **Read-only** for this query and run it once.
+
+```sql
+WITH new_code AS MATERIALIZED (
+  SELECT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '') AS code
+), saved AS (
+  INSERT INTO public.admin_recovery (singleton, token_hash, expires_at)
+  SELECT TRUE, encode(sha256(convert_to(code, 'UTF8')), 'hex'), now() + interval '30 minutes'
+  FROM new_code
+  ON CONFLICT (singleton) DO UPDATE
+  SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at
+  RETURNING singleton
+)
+SELECT code AS recovery_code FROM new_code CROSS JOIN saved;
+```
+
+Copy the result directly into **Recovery code** on the live **Forgot password?** page. Set a new password of at least 12 characters, then sign in as `admin`. The database stores a hash of the password. Treat the one-time recovery code like a password.
+
+### Customer dashboard
+
+Customers can edit their mobile number and default address, save a private UPI ID, and manage their wishlist and notifications. The admin dashboard can publish store announcements and create or deactivate percentage coupons. Active coupons are available to all signed-in customers. Checkout applies one coupon to the book subtotal and records the discount on the order. Shipping and tax remain subject to confirmation. Online payment collection requires a separate payment integration.
+
 ## Connect to PostgreSQL with pgAdmin
 
 1. Connect to the existing local PostgreSQL server in pgAdmin. Under **Login/Group Roles**, create `bhagwati_app`. Set a password on **Definition** and turn on **Can login?** under **Privileges**. Leave the cluster-wide admin privileges off.
@@ -38,6 +62,6 @@ To enable **Email me a code**, set `ADMIN_RECOVERY_EMAIL` to the owner's address
    npm start
    ```
 
-   The import creates the schema and copies the catalog, covers, portrait, store copy, accounts, sessions, orders and enquiries in one PostgreSQL transaction. It requires an empty target and leaves the source data intact. For a fresh store with the default catalog, skip the import and start the app after the connection check.
+   The import creates the schema and copies the catalog, covers, portrait, store copy, accounts, sessions, orders, enquiries and available dashboard data in one PostgreSQL transaction. It requires an empty target and leaves the source data intact. For a fresh store with the default catalog, skip the import and start the app after the connection check.
 
 To inspect the resulting tables in pgAdmin, refresh **Databases → bhagwati_publication → Schemas → public → Tables**. The PGlite directory remains available as a snapshot from before the move. Any edits made after switching belong to the PostgreSQL database.
