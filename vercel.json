@@ -3,6 +3,9 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ],
   "functions": {
     "api/*.ts": {
       "includeFiles": "backend/assets/author-saraswat.png"
