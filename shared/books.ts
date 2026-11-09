@@ -13,7 +13,7 @@ type BookDetails = {
   coverSubtitle?: string;
   category: string;
   price: number | null;
-  format: typeof bookFormats[number];
+  format: typeof bookFormats[number] | 'Bundle';
   language: string;
   artwork: typeof bookArtworks[number];
   palette: typeof bookPalettes[number];
@@ -30,12 +30,23 @@ export type Book = BookDetails & {
   featured: boolean;
   published: boolean;
   revision: number;
+  bundle?: { id: string; title: string; format: string }[];
 };
 
 export type Category = { id: number; name: string; description: string; revision: number };
 
 export function canOrder(book: Book | undefined): book is Book & { price: number } {
   return Boolean(book?.published && book.price !== null && book.stock !== 0);
+}
+
+export function needsDelivery(book: Book) {
+  return book.format === 'Bundle' ? book.bundle?.some(item => item.format !== 'eBook') ?? true : book.format !== 'eBook';
+}
+
+export function bookQuote(book: Book) {
+  return book.format === 'Bundle'
+    ? `${book.price}:Bundle:${book.revision}:${book.bundle?.map(item => item.id + '/' + item.format).join(',') ?? ''}`
+    : `${book.price}:${book.format}`;
 }
 
 export const author = 'Dr. S. B. Saraswat';

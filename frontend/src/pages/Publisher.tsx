@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Bell, BookOpen, ClipboardList, FileText, LayoutDashboard, Mail, RefreshCw, ShieldCheck, Tag, Tags, UserRound } from 'lucide-react';
+import { ArrowUpRight, Bell, BookOpen, ClipboardList, Download, FileText, LayoutDashboard, Mail, Package, RefreshCw, ShieldCheck, Star, Tag, Tags, UserRound } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { nextOrderStatuses, orderStatusLabels } from '../../../shared/store';
 import type { Enquiry, EnquiryEmailStatus, EnquirySettings, Order, OrderStatus, StoreOrder } from '../../../shared/store';
@@ -8,11 +8,15 @@ import { OrderCard, orderReference } from '../components/OrderCard';
 import { CatalogAdmin } from './CatalogAdmin';
 import { AdminOverview } from './AdminOverview';
 import { PublisherAnnouncements, PublisherCoupons } from './PublisherUpdates';
+import { PublisherEbooks, PublisherPayment, PublisherReviews } from './PublisherCommerce';
 
 type PublisherData = { orders: StoreOrder[]; enquiries: Enquiry[] };
 const sections = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'books', label: 'Books', icon: BookOpen },
+  { id: 'bundles', label: 'Bundles', icon: Package },
+  { id: 'ebooks', label: 'eBook files', icon: Download },
+  { id: 'reviews', label: 'Reviews', icon: Star },
   { id: 'categories', label: 'Categories', icon: Tags },
   { id: 'author', label: 'Author profile', icon: UserRound },
   { id: 'content', label: 'Store content', icon: FileText },
@@ -147,6 +151,8 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
     {!data ? (!error && <p role="status">Loading the dashboard…</p>) : enquiries
       ? <div className="account-orders">{messages.length === 0 && <p>No enquiries found.</p>}{messages.map(enquiry => <article className="order-card enquiry" key={enquiry.id}>
         <h3>{enquiry.fullName}</h3><p>{enquiry.email} · {new Date(enquiry.createdAt).toLocaleDateString('en-IN')}</p><p>{enquiry.message}</p>
+        {enquiry.bulkDetails && <p><strong>Bulk order</strong> · {enquiry.bulkDetails.quantity} copies · {enquiry.bulkDetails.city}
+          {enquiry.bulkDetails.neededBy && <> · Needed by {enquiry.bulkDetails.neededBy}</>}</p>}
         <p className="small-note">{enquiry.emailStatus ? enquiryEmailLabels[enquiry.emailStatus] : 'No email recorded'}</p>
         {(!enquiry.emailStatus || enquiry.emailStatus === 'failed') && <button className="button secondary" type="button" disabled={busy} onClick={() => void sendEmail(enquiry.id)}>
           {enquiry.emailStatus === 'failed' ? 'Retry email' : 'Send email to contact inbox'}
@@ -154,7 +160,12 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
       </article>)}</div>
       : <div className="account-orders">{orders.length === 0 && <p>No order requests found.</p>}{orders.map(order => <OrderCard order={order} key={order.id}>
         <p className="operator-customer">{order.fullName} · {order.email}</p>
-        <div className="inline-actions">{nextOrderStatuses(order).map(status => <button className={'button ' + (status === 'cancelled' ? 'secondary' : 'primary')} disabled={busy} type="button" key={status} onClick={() => void update(order.id, status)}>
+        <PublisherPayment order={order} disabled={busy} update={patch => setData(previous => previous && {
+          ...previous, orders: previous.orders.map(item => item.id === order.id ? { ...item, ...patch } : item)
+        })} />
+        <div className="inline-actions">{nextOrderStatuses(order).filter(status => status === 'cancelled'
+          ? order.refundedAt || (!order.paidAt && !order.paymentLinkId)
+          : status === 'confirmed' || order.finalTotal == null || order.paidAt).map(status => <button className={'button ' + (status === 'cancelled' ? 'secondary' : 'primary')} disabled={busy} type="button" key={status} onClick={() => void update(order.id, status)}>
           {status === 'cancelled' ? 'Cancel request' : status === 'confirmed' ? 'Confirm request' : 'Mark ' + orderStatusLabels[status].toLowerCase()}
         </button>)}</div>
       </OrderCard>)}</div>}
@@ -191,6 +202,8 @@ export function Publisher() {
         {section === 'overview' ? <AdminOverview />
           : section === 'coupons' ? <PublisherCoupons />
           : section === 'announcements' ? <PublisherAnnouncements />
+          : section === 'ebooks' ? <PublisherEbooks />
+          : section === 'reviews' ? <PublisherReviews />
           : section === 'orders' || section === 'enquiries' ? <Operations key={section + status} enquiries={section === 'enquiries'} initialStatus={status} />
           : <CatalogAdmin key={section + stock + action} section={section} startAdding={action === 'add'} lowStock={stock === 'low'} />}
       </section>

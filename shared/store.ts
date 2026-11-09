@@ -23,6 +23,7 @@ export type OrderLine = {
   format: string;
   quantity: number;
   unitPrice: number;
+  components?: { id: string; title: string; format: string }[];
 };
 
 export const orderStatusLabels = {
@@ -44,7 +45,15 @@ export type Order = {
   couponCode: string | null;
   discount: number;
   address: Address | null;
+  finalTotal: number | null;
+  paidAt: string | null;
+  paymentLinkId: string | null;
+  refundedAt: string | null;
 };
+
+export type Ebook = { id: string; title: string; available: boolean };
+export type Review = { id: string; bookId: string; title?: string; reviewer: string; rating: number; comment: string; approved: boolean };
+export type BulkDetails = { quantity: number; city: string; neededBy: string | null };
 
 export type Coupon = { code: string; percent: number; active: boolean };
 
@@ -72,6 +81,7 @@ export type Enquiry = {
   message: string;
   createdAt: string;
   emailStatus: EnquiryEmailStatus | null;
+  bulkDetails: BulkDetails | null;
 };
 
 export type EnquirySettings = { recipient: string; mailConfigured: boolean };

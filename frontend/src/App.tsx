@@ -80,7 +80,7 @@ function Footer() {
   return <footer className="footer"><div className="container">
     <div className="footer-grid">
       <div><Brand imprint /><p>Books on business, leadership, technology and Hindi literature.</p></div>
-      <nav aria-label="Explore"><h2>Explore</h2><Link to="/books">All books</Link><Link to="/author">Meet the author</Link><Link to="/about">Our story</Link><Link to="/contact">Contact</Link><Link to="/account">My account</Link></nav>
+      <nav aria-label="Explore"><h2>Explore</h2><Link to="/books">All books</Link><Link to="/books?format=Bundle">Book bundles</Link><Link to="/author">Meet the author</Link><Link to="/about">Our story</Link><Link to="/contact">Contact</Link><Link to="/contact?type=bulk">Bulk orders</Link><Link to="/account">My account</Link></nav>
       <nav aria-label="Store policies"><h2>Store policies</h2><Link to="/policies/shipping">Shipping</Link><Link to="/policies/returns">Returns</Link><Link to="/policies/privacy">Privacy</Link></nav>
     </div>
     <div className="footer-bottom"><span>Bhagwati Publication</span><span>Final prices and availability subject to publisher confirmation</span></div>

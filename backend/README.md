@@ -71,3 +71,12 @@ Set `CONTACT_EMAIL_FROM` to a sender on a domain you verified in Resend to deliv
    The import creates the schema and copies the catalog, covers, portrait, store copy, accounts, sessions, orders, enquiries and available dashboard data in one PostgreSQL transaction. It requires an empty target and leaves the source data intact. For a fresh store with the default catalog, skip the import and start the app after the connection check.
 
 To inspect the resulting tables in pgAdmin, refresh **Databases → bhagwati_publication → Schemas → public → Tables**. The PGlite directory remains available as a snapshot from before the move. Any edits made after switching belong to the PostgreSQL database.
+## Payments and digital orders
+
+In **Admin → Orders**, confirm the request to reserve stock, then save the final total including tax and delivery. The customer can pay from **My orders** when online payments are enabled. Use **Payment already received offline** only after verifying a payment collected outside the store. A zero-total order is settled when its final total is saved.
+
+To enable online payments on Vercel, set production environment variables `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` using a live merchant account. Configure a webhook at `https://bhagwatipublication.vercel.app/api/payments/razorpay/webhook` with the same webhook secret and the events `payment_link.paid` and `refund.processed`. Deploy after setting the variables. Test keys are accepted on localhost only. The store verifies captured amounts before recording payment. Issue online refunds in the Razorpay dashboard. Full refunds revoke access granted by that order.
+
+Upload the sale PDF in **Admin → eBook files**. The direct upload supports files up to 4 MB. PDF downloads require a signed-in account with a paid order for that eBook. Buyers can submit a rating and review on the book page. **Admin → Reviews** controls publication.
+
+Create or edit collections in **Admin → Bundles**. Each bundle has a price and two to ten titles. Its price and contents are recorded at checkout and its component stock is reserved at confirmation. Bulk quote requests appear in **Admin → Enquiries** with quantity, city and requested date.

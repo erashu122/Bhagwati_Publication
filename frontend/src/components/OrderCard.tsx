@@ -26,6 +26,7 @@ export function OrderCard({ order, children }: { order: Order; children?: ReactN
       <div className="order-card-total"><span>Coupon {order.couponCode}</span><strong>−{formatPrice(order.discount)}</strong></div>
       <div className="order-card-total"><span>After discount</span><strong>{formatPrice(order.estimatedSubtotal - order.discount)}</strong></div>
     </>}
+    {order.finalTotal != null && <div className="order-card-total"><span>{order.refundedAt ? 'Refunded' : order.paidAt ? 'Payment received' : 'Final total'}</span><strong>{formatPrice(order.finalTotal)}</strong></div>}
     {order.address ? <details className="order-address"><summary><MapPin size={16} aria-hidden="true" /> Delivery address</summary>
       <p>{order.address.fullName}<br />{order.address.street}<br />{order.address.city}, {order.address.state} {order.address.pin}<br />{order.address.phone}</p>
     </details> : <p className="digital-note"><BookOpen size={16} aria-hidden="true" /> Digital titles · No shipping address needed</p>}

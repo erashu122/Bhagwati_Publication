@@ -6,15 +6,17 @@ import express from 'express';
 import type { ErrorRequestHandler, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { couponDiscount, nextOrderStatuses, orderStatusLabels } from '../../shared/store.ts';
-import type { Coupon, Customer, Enquiry, Order, OrderStatus, PublisherOverview, StoreOrder } from '../../shared/store.ts';
+import type { BulkDetails, Coupon, Customer, Enquiry, Order, OrderLine, OrderStatus, PublisherOverview, StoreOrder } from '../../shared/store.ts';
 import type { Book } from '../../shared/books.ts';
-import { canOrder } from '../../shared/books.ts';
+import { bookQuote, canOrder } from '../../shared/books.ts';
 import { publicPages, siteOrigin } from '../../shared/site.ts';
 import { catalogRouter } from './catalog.ts';
 import { emailAdminRecovery } from './admin-recovery.ts';
 import { enquiryFields, enquirySettings, sendEnquiryEmail } from './enquiry-email.ts';
 import { couponCode, customerFeatures, notifyOrder } from './customer-features.ts';
 import { openDatabase } from './database.ts';
+import { paymentsRouter, razorpayWebhook } from './payments.ts';
+import { readingRouter } from './reading.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
 import { addressField, cartEntries, emailField, field, passwordField, phoneField, record, RequestError, uuidField } from './validation.ts';
 
@@ -31,7 +33,17 @@ const app = express();
 const api = express.Router();
 
 const customerFields = 'id, email, full_name AS "fullName", phone, upi_id AS "upiId", address, operator';
-const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address';
+const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address, final_total AS "finalTotal", paid_at AS "paidAt", payment_link_id AS "paymentLinkId", refunded_at AS "refundedAt"';
+
+function orderInventory(lines: OrderLine[]) {
+  const totals = new Map<string, { id: string; title: string; quantity: number }>();
+  for (const line of lines) {
+    for (const item of line.components ?? [line]) {
+      totals.set(item.id, { id: item.id, title: item.title, quantity: (totals.get(item.id)?.quantity ?? 0) + line.quantity });
+    }
+  }
+  return [...totals.values()];
+}
 
 app.disable('x-powered-by');
 if (onVercel || process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
@@ -46,15 +58,18 @@ app.use((_request, response, next) => {
 
 api.use((request, response, next) => {
   response.set('Cache-Control', 'no-store');
+  const pdfUpload = request.method === 'PATCH' && /^\/publisher\/ebooks\/[^/]+$/.test(request.path) && request.is('application/pdf');
   if (['POST', 'PATCH', 'DELETE'].includes(request.method) &&
-      (request.get('X-Store-Request') !== '1' || request.get('Sec-Fetch-Site') === 'cross-site' || !request.is('application/json'))) {
+      (request.get('X-Store-Request') !== '1' || request.get('Sec-Fetch-Site') === 'cross-site' || (!request.is('application/json') && !pdfUpload))) {
     throw new RequestError(403, 'Open the store directly and try again.');
   }
   next();
 });
 api.use(catalogRouter(db, request => requireCustomer(request, true)));
+api.use(readingRouter(db, signedInCustomer, requireCustomer));
 api.use(express.json({ limit: '24kb' }));
 api.use(customerFeatures(db, signedInCustomer, requireCustomer));
+api.use(paymentsRouter(db, requireCustomer));
 
 const authLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -269,23 +284,39 @@ api.post('/orders', async (request, response) => {
       return order;
     }
 
-    const { rows } = await tx.query<Book>(
-      'SELECT id, title, format, price, stock, published FROM books WHERE id = ANY($1::text[]) ORDER BY id FOR SHARE',
+    const { rows } = await tx.query<Book & { componentIds: string[] | null }>(
+      `SELECT id, title, format, price, stock, published, revision, component_ids AS "componentIds"
+         FROM books WHERE id = ANY($1::text[])
+           OR id IN (SELECT unnest(component_ids) FROM books WHERE id = ANY($1::text[]))
+        ORDER BY id FOR SHARE`,
       [entries.map(([id]) => id)]
     );
     const books = new Map(rows.map(book => [book.id, book]));
     const quote = body.quote === undefined ? {} : record(body.quote);
-    const lines = entries.map(([id, quantity]) => {
+    const lines = entries.map<OrderLine>(([id, quantity]) => {
       const book = books.get(id);
       if (!canOrder(book) || (book.stock !== null && quantity > book.stock)) {
         throw new RequestError(409, 'Availability has changed. Review the quantities in your bag and try again.');
       }
-      if (quote[id] !== `${book.price}:${book.format}`) {
+      const line = { id, title: book.title, format: book.format, quantity, unitPrice: book.price };
+      if (book.format === 'Bundle') {
+        if (!book.componentIds || book.componentIds.length < 2) throw new RequestError(409, 'This bundle is unavailable.');
+        book.bundle = book.componentIds.map(componentId => {
+          const member = books.get(componentId);
+          if (!canOrder(member) || member.format === 'Bundle') throw new RequestError(409, 'A book in this bundle is unavailable.');
+          return { id: member.id, title: member.title, format: member.format };
+        });
+      }
+      if (quote[id] !== bookQuote(book)) {
         throw new RequestError(409, 'The catalog has changed. Review the updated book prices and formats before submitting again.');
       }
-      return { id, title: book.title, format: book.format, quantity, unitPrice: book.price };
+      return book.bundle ? { ...line, components: book.bundle } : line;
     });
-    const { address, saveAddress, requestHash } = delivery(lines.some(line => line.format !== 'eBook'));
+    for (const line of orderInventory(lines)) {
+      const stock = books.get(line.id)?.stock;
+      if (stock != null && line.quantity > stock) throw new RequestError(409, `Not enough copies of ${line.title} for the books and bundles in this bag.`);
+    }
+    const { address, saveAddress, requestHash } = delivery(lines.some(line => (line.components ?? [line]).some(item => item.format !== 'eBook')));
     const subtotal = lines.reduce((total, line) => total + line.unitPrice * line.quantity, 0);
     let discount = 0;
     if (code) {
@@ -313,8 +344,24 @@ api.post('/enquiries', contactLimit, async (request, response) => {
   const name = field(body.fullName, 'name', 100);
   const email = emailField(body.email);
   const message = field(body.message, 'message', 2500);
+  let bulk: BulkDetails | null = null;
+  if (body.bulkDetails !== undefined) {
+    const details = record(body.bulkDetails);
+    const { quantity } = details;
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+      throw new RequestError(400, 'Enter a quantity from 1 to 100,000.');
+    }
+    const neededBy = details.neededBy ? field(details.neededBy, 'required date', 10) : null;
+    if (neededBy) {
+      const date = new Date(neededBy + 'T00:00:00Z');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(neededBy) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== neededBy) {
+        throw new RequestError(400, 'Choose a valid required date.');
+      }
+    }
+    bulk = { quantity, city: field(details.city, 'delivery city', 100), neededBy };
+  }
   const id = randomUUID();
-  await db.query('INSERT INTO enquiries (id, full_name, email, message) VALUES ($1, $2, $3, $4)', [id, name, email, message]);
+  await db.query('INSERT INTO enquiries (id, full_name, email, message, bulk_details) VALUES ($1, $2, $3, $4, $5)', [id, name, email, message, bulk && JSON.stringify(bulk)]);
   try {
     await sendEnquiryEmail(db, id);
   } catch {
@@ -369,7 +416,8 @@ api.get('/publisher', async (request, response) => {
   await requireCustomer(request, true);
   const orders = await db.query<StoreOrder>(
     `SELECT o.id, o.status, o.created_at AS "createdAt", o.lines, o.subtotal AS "estimatedSubtotal",
-            o.address, o.coupon_code AS "couponCode", o.discount, c.email, c.full_name AS "fullName"
+            o.address, o.coupon_code AS "couponCode", o.discount, o.final_total AS "finalTotal", o.paid_at AS "paidAt",
+            o.payment_link_id AS "paymentLinkId", o.refunded_at AS "refundedAt", c.email, c.full_name AS "fullName"
        FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.created_at DESC`
   );
   const enquiries = await db.query<Enquiry>(
@@ -395,13 +443,20 @@ api.patch('/publisher/orders/:id', async (request, response) => {
     if (!nextOrderStatuses(order).includes(status as OrderStatus)) {
       throw new RequestError(409, 'This status change is unavailable. Refresh the dashboard.');
     }
+    if (status === 'cancelled' && !order.refundedAt && (order.paidAt || order.paymentLinkId)) {
+      throw new RequestError(409, 'Resolve the payment before cancelling this order.');
+    }
+    if ((status === 'shipped' || status === 'completed') && order.finalTotal != null && !order.paidAt) {
+      throw new RequestError(409, 'Confirm payment before fulfilling this order.');
+    }
     const reserved = order.reserved_inventory ?? [];
+    const inventory = status === 'confirmed' ? orderInventory(order.lines) : reserved;
     if (status === 'confirmed' || status === 'cancelled' && reserved.length) {
-      const ids = (status === 'confirmed' ? order.lines : reserved).map(line => line.id);
+      const ids = inventory.map(line => line.id);
       await tx.query('SELECT id FROM books WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE', [ids]);
     }
     if (status === 'confirmed') {
-      for (const line of order.lines) {
+      for (const line of orderInventory(order.lines)) {
         const { rows: [book] } = await tx.query<{ stock: number | null }>('SELECT stock FROM books WHERE id = $1', [line.id]);
         if (!book || book.stock === null) continue;
         if (book.stock < line.quantity) throw new RequestError(409, `Not enough stock to confirm ${line.title}.`);
@@ -442,6 +497,7 @@ const sendError: ErrorRequestHandler = (error, _request, response, next) => {
   response.status(500).json({ error: 'Something went wrong. Please try again.' });
 };
 
+app.use('/api/payments/razorpay/webhook', razorpayWebhook(db), sendError);
 app.use('/api', api, sendError);
 
 app.get('/sitemap.xml', async (_request, response) => {

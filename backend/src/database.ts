@@ -87,6 +87,38 @@ export async function initializeSchema(tx: DatabaseExecutor, seed = true) {
       UNIQUE (customer_id, notification_id)
     );
   `);
+  const { rows } = await tx.query("INSERT INTO store_migrations (name) VALUES ('commerce-v1') ON CONFLICT DO NOTHING RETURNING name");
+  if (!rows.length) return;
+  await tx.exec(`
+    ALTER TABLE books DROP CONSTRAINT books_format_check;
+    ALTER TABLE books ADD CHECK (format IN ('eBook', 'Paperback', 'Hardcover', 'Bundle'));
+    ALTER TABLE books ADD COLUMN component_ids TEXT[];
+    ALTER TABLE orders ADD COLUMN final_total INTEGER CHECK (final_total BETWEEN 0 AND 1000000);
+    ALTER TABLE orders ADD COLUMN paid_at TIMESTAMPTZ;
+    ALTER TABLE orders ADD COLUMN payment_link_id TEXT UNIQUE;
+    ALTER TABLE orders ADD COLUMN payment_attempt SMALLINT CHECK (payment_attempt BETWEEN 1 AND 9999);
+    ALTER TABLE orders ADD COLUMN payment_id TEXT UNIQUE;
+    ALTER TABLE orders ADD COLUMN refunded_at TIMESTAMPTZ;
+    ALTER TABLE enquiries ADD COLUMN bulk_details JSONB;
+    CREATE TABLE ebook_files (
+      book_id TEXT PRIMARY KEY REFERENCES books(id),
+      bytes BYTEA NOT NULL CHECK (octet_length(bytes) BETWEEN 8 AND 4000000)
+    );
+    CREATE TABLE book_reviews (
+      id UUID PRIMARY KEY,
+      book_id TEXT NOT NULL REFERENCES books(id),
+      customer_id UUID NOT NULL REFERENCES customers(id),
+      rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      comment TEXT NOT NULL,
+      approved BOOLEAN NOT NULL DEFAULT FALSE,
+      UNIQUE (book_id, customer_id)
+    );
+    CREATE VIEW paid_books AS
+      SELECT o.customer_id, item->>'id' AS book_id, item->>'format' AS format, item->>'title' AS title
+        FROM orders o CROSS JOIN LATERAL jsonb_array_elements(o.lines) AS line
+        CROSS JOIN LATERAL jsonb_array_elements(jsonb_build_array(line) || COALESCE(line->'components', '[]'::jsonb)) AS item
+       WHERE o.paid_at IS NOT NULL AND o.status <> 'cancelled';
+  `);
 }
 
 export async function lockPostgresSchema(tx: DatabaseExecutor) {

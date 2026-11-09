@@ -8,6 +8,7 @@ import { useCatalog } from '../catalog';
 import { WishlistButton } from '../customer-extras';
 import { matchesAuthor } from '../../../shared/content';
 import { AuthorPortrait } from '../components/AuthorPortrait';
+import { BookReviews } from '../components/ReadingCommerce';
 
 type AddBook = { add: (id: string) => void };
 
@@ -21,7 +22,8 @@ export function Catalog({ add }: AddBook) {
   const keywords = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   const results = books.filter(book => {
     const text = [book.title, book.author, book.language, book.category, book.format].join(' ').toLocaleLowerCase();
-    return (!selected || book.category === selected) && keywords.every(keyword => text.includes(keyword));
+    return (!selected || book.category === selected) && (params.get('format') !== 'Bundle' || book.format === 'Bundle') &&
+      keywords.every(keyword => text.includes(keyword));
   });
 
   if (sort === 'price-asc' || sort === 'price-desc') {
@@ -61,6 +63,8 @@ export function Catalog({ add }: AddBook) {
         <div className="filter-list" role="group" aria-label="Filter by category">
           {['', ...categoryNames].map(category => <button type="button" className="filter" key={category} aria-pressed={category === selected} onClick={() => updateFilter('category', category)}>{category || 'All categories'}</button>)}
         </div>
+        <button type="button" className="filter" aria-pressed={params.get('format') === 'Bundle'}
+          onClick={() => updateFilter('format', params.get('format') === 'Bundle' ? '' : 'Bundle')}>Bundles only</button>
         <p className="muted" role="status">{results.length} {results.length === 1 ? 'book' : 'books'}</p>
       </div>
       {results.length ? <div className="book-grid">{results.map(book => <BookCard key={book.id} book={book} add={add} />)}</div> : <div className="empty-panel">
@@ -116,6 +120,9 @@ export function BookDetails({ add }: AddBook) {
           <AuthorPortrait name={content.authorName} photo={authorPhoto} decorative /><span>By {book.author}</span>
         </Link> : <p className="detail-author">By {book.author}</p>}
         <p lang={book.language === 'Hindi' ? 'hi' : 'en'}>{book.description}</p>
+        {!!book.bundle?.length && <section className="feature-stack"><h2>Included books</h2><ul className="notification-list">
+          {book.bundle.map(item => <li key={item.id}><Link className="text-link" to={'/books/' + item.id}>{item.title}</Link><span>{item.format}</span></li>)}
+        </ul></section>}
         {preview && <button className="button secondary preview-jump" type="button" onClick={openPreview}><BookOpen size={17} aria-hidden="true" /> Read a preview</button>}
         <dl className="book-facts"><div><dt>Format</dt><dd>{book.format}</dd></div><div><dt>Language</dt><dd>{book.language}</dd></div></dl>
         {!canOrder(book) ? <p className="availability">{book.stock === 0 ? 'Out of stock' : 'Currently unavailable'}</p> : <div className="purchase">
@@ -140,6 +147,7 @@ export function BookDetails({ add }: AddBook) {
         {canOrder(book) && <button type="button" className="button primary" onClick={() => add(book.id)}><ShoppingBag size={17} aria-hidden="true" /> Add to bag · {formatPrice(book.price)}</button>}
       </div>
     </section>}
+    <BookReviews key={book.id} id={book.id} />
     <section className="related">
       <div className="section-heading"><div><p className="eyebrow"><span className="diamond" /> KEEP EXPLORING</p><h2>Related books</h2></div><Link className="text-link" to="/books">View all books <ArrowRight size={17} aria-hidden="true" /></Link></div>
       <div className="book-grid">{related.slice(0, 3).map(candidate => <BookCard key={candidate.id} book={candidate} add={add} />)}</div>

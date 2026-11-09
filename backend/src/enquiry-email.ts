@@ -2,7 +2,7 @@ import type { Enquiry, EnquiryEmailStatus, EnquirySettings } from '../../shared/
 import type { DatabaseExecutor } from './database-driver.ts';
 import { RequestError } from './validation.ts';
 
-export const enquiryFields = 'id, full_name AS "fullName", email, message, created_at AS "createdAt", email_status AS "emailStatus"';
+export const enquiryFields = 'id, full_name AS "fullName", email, message, created_at AS "createdAt", email_status AS "emailStatus", bulk_details AS "bulkDetails"';
 
 export async function enquirySettings(db: DatabaseExecutor): Promise<EnquirySettings> {
   const { rows: [settings] } = await db.query<{ recipient: string }>('SELECT recipient FROM enquiry_settings WHERE singleton = TRUE');
@@ -35,8 +35,10 @@ export async function sendEnquiryEmail(db: DatabaseExecutor, id: string) {
           from: sender,
           to: [recipient],
           reply_to: enquiry.email,
-          subject: 'New contact enquiry · Bhagwati Publication',
-          text: `Name: ${enquiry.fullName}\nEmail: ${enquiry.email}\n\n${enquiry.message}`
+          subject: enquiry.bulkDetails ? 'Bulk order enquiry · Bhagwati Publication' : 'New contact enquiry · Bhagwati Publication',
+          text: `Name: ${enquiry.fullName}\nEmail: ${enquiry.email}\n` +
+            (enquiry.bulkDetails ? `Quantity: ${enquiry.bulkDetails.quantity}\nDelivery city: ${enquiry.bulkDetails.city}\nNeeded by: ${enquiry.bulkDetails.neededBy ?? 'Flexible'}\n` : '') +
+            '\n' + enquiry.message
         }),
         signal: AbortSignal.timeout(7000)
       });

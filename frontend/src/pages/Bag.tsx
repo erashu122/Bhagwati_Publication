@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ArrowRight, BookOpen, Minus, Plus, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { couponDiscount } from '../../../shared/store';
+import { bookQuote, needsDelivery } from '../../../shared/books';
 import type { Coupon, Order } from '../../../shared/store';
 import { errorMessage, StoreError, storeRequest, useAccount } from '../account';
 import { AddressFields, readAddress } from '../components/AddressFields';
@@ -59,7 +60,7 @@ export function Bag({ cart, change }: { cart: Cart; change: (id: string, quantit
         <p>{booksById.get(id)?.title ?? 'An item in your bag'} is no longer available.</p>
         <button className="remove-button" type="button" onClick={() => change(id, 0)}><Trash2 size={15} aria-hidden="true" /> Remove unavailable item</button>
       </li>)}</ul>
-      <OrderSummary items={items} blocked={blocked} needsShipping={items.some(item => item.book.format !== 'eBook')} />
+      <OrderSummary items={items} blocked={blocked} needsShipping={items.some(item => needsDelivery(item.book))} />
     </div>}
     {items.length > 0 && <Link className="text-link return-link" to="/books">Continue browsing <ArrowRight size={17} aria-hidden="true" /></Link>}
   </section>;
@@ -99,7 +100,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
   const [couponError, setCouponError] = useState('');
   const [reloadCoupons, setReloadCoupons] = useState(0);
   const activeCoupon = coupons.find(coupon => coupon.code === selectedCode);
-  const needsShipping = items.some(item => item.book.format !== 'eBook');
+  const needsShipping = items.some(item => needsDelivery(item.book));
   const customerId = customer?.id;
 
   useEffect(() => {
@@ -126,7 +127,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
       request.current = checkoutKey(customer.id, cart, request.current);
       const { order } = await storeRequest<{ order: Order }>('/orders', 'POST', {
         cart,
-        quote: Object.fromEntries(items.map(({ book }) => [book.id, `${book.price}:${book.format}`])),
+        quote: Object.fromEntries(items.map(({ book }) => [book.id, bookQuote(book)])),
         requestKey: request.current.key,
         address: needsShipping ? readAddress(form) : null,
         saveAddress,
@@ -178,7 +179,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
             </select>
           </label>
           {couponError && <p className="form-error" role="alert">{couponError} <button className="text-link" type="button" onClick={() => setReloadCoupons(value => value + 1)}>Retry coupons</button></p>}
-          <p className="checkout-note">The publisher will confirm availability, final charges and payment instructions. No payment is collected here.</p>
+          <p className="checkout-note">The publisher will confirm availability and the final total. Open My orders to pay after confirmation.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button primary" disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit order request'} <ArrowRight size={17} aria-hidden="true" /></button>
         </form>

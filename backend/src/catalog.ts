@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseExecutor, StoreDatabase } from './database-driver.ts';
 import express from 'express';
 import type { Request, RequestHandler } from 'express';
-import { bookArtworks, bookFormats, bookPalettes, readingPreviewKinds, readingPreviewMaxLength } from '../../shared/books.ts';
+import { bookArtworks, bookFormats, bookPalettes, canOrder, readingPreviewKinds, readingPreviewMaxLength } from '../../shared/books.ts';
 import type { Book, Category } from '../../shared/books.ts';
 import { contentFields } from '../../shared/content.ts';
 import type { ContentRecord, StoreContent } from '../../shared/content.ts';
@@ -54,12 +54,12 @@ function imageFile(value: unknown) {
 }
 
 async function listBooks(db: DatabaseExecutor, publishedOnly: boolean) {
-  const { rows } = await db.query<Book>(`
+  const { rows } = await db.query<Book & { componentIds: string[] | null }>(`
     SELECT b.id, b.title, b.author, b.category_id AS "categoryId", c.name AS category, b.format, b.language,
            b.description, COALESCE(b.reading_preview, '') AS "readingPreview",
            COALESCE(b.reading_preview_kind, 'overview') AS "readingPreviewKind",
            b.price, b.stock, b.published, b.featured, b.cover_title AS "coverTitle",
-           b.cover_subtitle AS "coverSubtitle", b.artwork, b.palette, b.revision,
+           b.cover_subtitle AS "coverSubtitle", b.artwork, b.palette, b.revision, b.component_ids AS "componentIds",
            CASE WHEN bc.book_id IS NULL THEN b.cover_url
                 ELSE '/api/catalog/covers/' || b.id || '?v=' || b.revision END AS "coverImage"
       FROM books b JOIN categories c ON c.id = b.category_id
@@ -67,7 +67,17 @@ async function listBooks(db: DatabaseExecutor, publishedOnly: boolean) {
      WHERE ($1 = FALSE OR b.published)
      ORDER BY b.featured DESC, b.position
   `, [publishedOnly]);
-  return rows;
+  const byId = new Map(rows.map(book => [book.id, book]));
+  return rows.map(({ componentIds, ...book }) => {
+    if (!componentIds) return book;
+    const members = componentIds.map(id => byId.get(id));
+    const available = members.length >= 2 && members.every(canOrder);
+    const stocks = members.flatMap(member => member?.stock == null ? [] : [member.stock]);
+    return {
+      ...book, stock: !available ? 0 : stocks.length ? Math.min(...stocks) : null,
+      bundle: members.flatMap(member => member ? [{ id: member.id, title: member.title, format: member.format }] : [])
+    };
+  });
 }
 
 async function snapshot(db: StoreDatabase, publishedOnly: boolean) {
@@ -192,7 +202,7 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
                  artwork=$14, palette=$15, cover_url=CASE WHEN $17 THEN NULL ELSE cover_url END,
                  reading_preview=COALESCE($18, reading_preview), reading_preview_kind=COALESCE($19, reading_preview_kind),
                  updated_at=NOW(), revision=revision+1
-           WHERE id=$1 AND revision=$16 RETURNING id
+           WHERE id=$1 AND revision=$16 AND format <> 'Bundle' RETURNING id
         `, [...params, positiveInteger(body.revision, 'revision'), cover !== undefined, preview, previewKind]);
         if (!rows.length) throw stale();
       } else {
@@ -215,6 +225,44 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
 
   router.post('/publisher/catalog/books', saveBook);
   router.patch('/publisher/catalog/books/:id', saveBook);
+
+  const saveBundle: RequestHandler = async (request, response) => {
+    const editing = request.method === 'PATCH';
+    const id = editing ? bookId(request.params.id) : randomUUID();
+    const body = record(request.body);
+    const title = field(body.title, 'bundle title', 180);
+    const description = field(body.description, 'bundle description', 3000);
+    const category = positiveInteger(body.categoryId, 'category');
+    const price = positiveInteger(body.price, 'bundle price');
+    if (price > 1000000 || typeof body.published !== 'boolean' || !Array.isArray(body.bookIds)) {
+      throw new RequestError(400, 'Choose a valid price, visibility and books.');
+    }
+    const ids = [...new Set(body.bookIds.map(bookId))];
+    if (ids.length < 2 || ids.length > 10) throw new RequestError(400, 'Choose between two and ten different books.');
+    await db.transaction(async tx => {
+      const members = await tx.query("SELECT id FROM books WHERE id = ANY($1::text[]) AND format <> 'Bundle'", [ids]);
+      if (members.rows.length !== ids.length) throw new RequestError(400, 'Choose books from the catalogue.');
+      const group = await tx.query('SELECT id FROM categories WHERE id = $1 FOR KEY SHARE', [category]);
+      if (!group.rows.length) throw new RequestError(400, 'Choose an existing category.');
+      if (editing) {
+        const result = await tx.query(`
+          UPDATE books SET title=$2, cover_title=$2, description=$3, category_id=$4, price=$5,
+                 published=$6, component_ids=$7, revision=revision+1, updated_at=NOW()
+           WHERE id=$1 AND revision=$8 AND format='Bundle' RETURNING id
+        `, [id, title, description, category, price, body.published, ids, positiveInteger(body.revision, 'revision')]);
+        if (!result.rows.length) throw stale();
+      } else {
+        await tx.query(`
+          INSERT INTO books (id, title, cover_title, description, category_id, price, published, component_ids, format, language, author, artwork, palette)
+          VALUES ($1,$2,$2,$3,$4,$5,$6,$7,'Bundle','Multiple','Bhagwati Publication','boxes','slate')
+        `, [id, title, description, category, price, body.published, ids]);
+        if (body.published) await notifyBook(tx, id, title);
+      }
+    });
+    response.status(editing ? 200 : 201).json({ id });
+  };
+  router.post('/publisher/catalog/bundles', saveBundle);
+  router.patch('/publisher/catalog/bundles/:id', saveBundle);
 
   router.patch('/publisher/catalog/books/:id/visibility', async (request, response) => {
     const id = bookId(request.params.id);

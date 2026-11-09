@@ -11,6 +11,7 @@ import { OrderCard, orderReference } from '../components/OrderCard';
 import { BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
 import { Coupons, NotificationList, Wishlist } from '../customer-extras';
+import { EbookLibrary, OrderPayment } from '../components/ReadingCommerce';
 
 function PasswordField({ label = 'Password', name = 'password', create = false }: {
   label?: string;
@@ -271,10 +272,17 @@ const accountTabs = [
   { id: 'wishlist', label: 'Wishlist', icon: Heart },
   { id: 'coupons', label: 'Coupons', icon: Tag },
   { id: 'payment', label: 'Payments & UPI', icon: Wallet },
-  { id: 'notifications', label: 'Notifications', icon: Bell }
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'ebooks', label: 'My eBooks', icon: BookOpen }
 ] as const;
 
 export function Dashboard({ customer, cartCount }: { customer: Customer; cartCount: number }) {
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    storeRequest<{ enabled: boolean }>('/payments/config').then(result => { if (active) setPaymentsEnabled(result.enabled); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const { setCustomer } = useAccount();
   const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[] | null>(null);
@@ -357,6 +365,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
       {tab === 'wishlist' && <Wishlist />}
       {tab === 'coupons' && <Coupons />}
       {tab === 'notifications' && <NotificationList />}
+      {tab === 'ebooks' && <EbookLibrary />}
       {(tab === 'overview' || tab === 'orders') && <>
         <div className="section-heading">
           <div><h2>{tab === 'orders' ? 'My orders' : 'Latest order'}</h2><p>View order details and track the current status.</p></div>
@@ -365,7 +374,9 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
         {orderError ? <div className="empty-panel"><p role="alert">{orderError}</p><button className="button primary" type="button" onClick={() => setReload(value => value + 1)}>Try again</button></div>
           : orders === null ? <p role="status">Loading your orders…</p>
           : !displayedOrders?.length ? <div className="empty-panel"><Package size={32} aria-hidden="true" /><h2>{viewedOrder ? 'Order unavailable' : 'No orders yet'}</h2><p>Your order requests will appear here.</p></div>
-          : <div className="account-orders">{displayedOrders.map(order => <OrderCard key={order.id} order={order} />)}</div>}
+          : <div className="account-orders">{displayedOrders.map(order => <OrderCard key={order.id} order={order}>
+            <OrderPayment order={order} enabled={paymentsEnabled} refresh={() => setReload(value => value + 1)} />
+          </OrderCard>)}</div>}
       </>}
     </section>
   </>;

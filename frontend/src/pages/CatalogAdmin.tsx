@@ -11,7 +11,7 @@ import type { CatalogData } from '../catalog';
 import { BookCover } from '../components/BookCover';
 import { AuthorPortrait } from '../components/AuthorPortrait';
 
-export type CatalogSection = 'books' | 'categories' | 'content' | 'author';
+export type CatalogSection = 'books' | 'bundles' | 'categories' | 'content' | 'author';
 const root = '/publisher/catalog';
 type Save = (path: string, method: string, body: unknown, message: string) => Promise<boolean>;
 
@@ -118,16 +118,17 @@ function BooksPanel({ data, save, busy, startAdding, lowStock }: { data: Catalog
   const [stockOnly, setStockOnly] = useState(lowStock);
   const [query, setQuery] = useState('');
   const search = query.trim().toLocaleLowerCase();
-  const results = data.books.filter(book =>
+  const books = data.books.filter(book => book.format !== 'Bundle');
+  const results = books.filter(book =>
     (filter === 'all' || book.published === (filter === 'published')) &&
     (!stockOnly || (book.published && book.stock !== null && book.stock <= 5)) &&
     [book.title, book.author, book.category].some(text => text.toLocaleLowerCase().includes(search))
   );
   return <>
     <div className="admin-metrics">
-      <div><strong>{data.books.length}</strong><span>Total titles</span></div>
-      <div><strong>{data.books.filter(book => book.published).length}</strong><span>Visible in store</span></div>
-      <div><strong>{data.books.filter(book => book.stock === 0).length}</strong><span>Out of stock</span></div>
+      <div><strong>{books.length}</strong><span>Total titles</span></div>
+      <div><strong>{books.filter(book => book.published).length}</strong><span>Visible in store</span></div>
+      <div><strong>{books.filter(book => book.stock === 0).length}</strong><span>Out of stock</span></div>
     </div>
     <div className="admin-tools">
       <div><h2>Books</h2><p>Manage your catalog, prices, stock and covers.</p></div>
@@ -282,6 +283,47 @@ function AuthorPanel({ data, save, busy }: { data: CatalogData; save: Save; busy
   </>;
 }
 
+function BundlesPanel({ data, save, busy }: { data: CatalogData; save: Save; busy: boolean }) {
+  const [editor, setEditor] = useState<Book | null | undefined>();
+  const books = data.books.filter(book => book.format !== 'Bundle');
+  const bundles = data.books.filter(book => book.format === 'Bundle');
+  return <div className="feature-stack">
+    <div className="admin-tools"><div><h2>Book bundles</h2><p>Combine two to ten titles under one price.</p></div>
+      <button className="button primary" type="button" onClick={() => setEditor(null)} disabled={busy || books.length < 2}>Add bundle</button>
+    </div>
+    {editor !== undefined && <form className="form-panel form-stack" key={editor?.id ?? 'new'} onSubmit={async event => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      const saved = await save(root + '/bundles' + (editor ? '/' + editor.id : ''), editor ? 'PATCH' : 'POST', {
+        title: values.get('title'), description: values.get('description'), categoryId: Number(values.get('categoryId')),
+        price: Number(values.get('price')), bookIds: values.getAll('bookId'), published: values.has('published'),
+        revision: editor?.revision
+      }, 'Bundle saved.');
+      if (saved) setEditor(undefined);
+    }}>
+      <div className="form-grid">
+        <label className="field">Bundle name<input name="title" required maxLength={180} defaultValue={editor?.title} /></label>
+        <label className="field">Price (₹)<input name="price" type="number" required min={1} max={1000000} defaultValue={editor?.price ?? undefined} /></label>
+        <label className="field">Category<select name="categoryId" required defaultValue={editor?.categoryId}>
+          {data.categories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}
+        </select></label>
+        <label className="field field-wide">Description<textarea required name="description" rows={3} maxLength={3000} defaultValue={editor?.description} /></label>
+      </div>
+      <fieldset className="admin-content-group"><legend>Included books</legend><div className="feature-stack">
+        {books.map(book => <label className="checkbox-field" key={book.id}><input name="bookId" type="checkbox" value={book.id}
+          defaultChecked={editor?.bundle?.some(member => member.id === book.id)} />{book.title} · {book.format}{book.published ? '' : ' (hidden)'}</label>)}
+      </div></fieldset>
+      <label className="checkbox-field"><input name="published" type="checkbox" defaultChecked={editor?.published} /> Publish on the storefront</label>
+      <div className="inline-actions"><button className="button primary" disabled={busy} type="submit">Save bundle</button>
+        <button className="button secondary" type="button" onClick={() => setEditor(undefined)}>Close</button></div>
+    </form>}
+    {!bundles.length ? <p>No bundles created yet.</p> : <ul className="notification-list">{bundles.map(bundle => <li key={bundle.id}>
+      <div><h3>{bundle.title}</h3><p>{bundle.bundle?.length ?? 0} books · {formatPrice(bundle.price ?? 0)} · {bundle.published ? 'Published' : 'Hidden'}</p></div>
+      <button className="button secondary" type="button" disabled={busy} onClick={() => setEditor(bundle)}>Edit bundle</button>
+    </li>)}</ul>}
+  </div>;
+}
+
 export function CatalogAdmin({ section, startAdding = false, lowStock = false }: { section: CatalogSection; startAdding?: boolean; lowStock?: boolean }) {
   const [data, setData] = useState<CatalogData | null>(null);
   const [error, setError] = useState('');
@@ -325,6 +367,7 @@ export function CatalogAdmin({ section, startAdding = false, lowStock = false }:
     }}>Refresh dashboard</button></div>}
     {!data ? (!error && <p role="status">Loading the catalog…</p>) : section === 'books' ? <BooksPanel data={data} save={save} busy={busy} startAdding={startAdding} lowStock={lowStock} />
       : section === 'categories' ? <CategoriesPanel data={data} save={save} busy={busy} />
+      : section === 'bundles' ? <BundlesPanel data={data} save={save} busy={busy} />
       : section === 'author' ? <AuthorPanel key={data.revision} data={data} save={save} busy={busy} />
       : <ContentPanel data={data} save={save} busy={busy} />}
   </>;

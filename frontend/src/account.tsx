@@ -13,11 +13,12 @@ export class StoreError extends Error {
 }
 
 export async function storeRequest<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const upload = body instanceof Blob ? body : undefined;
   const response = await fetch('/api' + path, {
     method,
     credentials: 'same-origin',
-    headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json', 'X-Store-Request': '1' },
-    body: body === undefined ? undefined : JSON.stringify(body)
+    headers: method === 'GET' ? undefined : { 'Content-Type': upload?.type ?? 'application/json', 'X-Store-Request': '1' },
+    body: upload ?? (body === undefined ? undefined : JSON.stringify(body))
   });
   const data = await response.json().catch(() => null);
   if (!response.ok || data === null) {

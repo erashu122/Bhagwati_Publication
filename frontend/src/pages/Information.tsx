@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArrowRight, BookOpen, CheckCircle2, MessageSquare } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { errorMessage, storeRequest, useAccount } from '../account';
 import { BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
@@ -24,6 +24,8 @@ export function About() {
 }
 
 export function Contact() {
+  const [params] = useSearchParams();
+  const bulk = params.get('type') === 'bulk';
   const { customer } = useAccount();
   const { content } = useCatalog();
   const [complete, setComplete] = useState(false);
@@ -36,7 +38,11 @@ export function Contact() {
     setBusy(true);
     setError('');
     try {
-      await storeRequest('/enquiries', 'POST', Object.fromEntries(new FormData(form)));
+      const values = new FormData(form);
+      await storeRequest('/enquiries', 'POST', {
+        fullName: values.get('fullName'), email: values.get('email'), message: values.get('message'),
+        bulkDetails: bulk ? { quantity: Number(values.get('quantity')), city: values.get('city'), neededBy: values.get('neededBy') } : undefined
+      });
       form.reset();
       setComplete(true);
     } catch (error) {
@@ -52,18 +58,26 @@ export function Contact() {
     <p className="page-intro">{content.contactIntro}</p>
     <div className="information-grid contact-grid">
       <form className="form-panel" onSubmit={submit} onInput={() => setComplete(false)}>
-        <h2>Send an enquiry</h2>
+        <h2>{bulk ? 'Request a bulk order quote' : 'Send an enquiry'}</h2>
         <div className="form-grid">
           <label className="field">Name<input required name="fullName" maxLength={100} autoComplete="name" defaultValue={customer?.fullName} /></label>
           <label className="field">Email<input required type="email" name="email" maxLength={254} autoComplete="email" defaultValue={customer?.email} /></label>
-          <label className="field field-wide">Message<textarea required name="message" maxLength={2500} rows={6} /></label>
+          {bulk && <>
+            <label className="field">Number of copies<input required name="quantity" type="number" min={1} max={100000} /></label>
+            <label className="field">Delivery city<input required name="city" maxLength={100} autoComplete="address-level2" /></label>
+            <label className="field">Needed by (optional)<input name="neededBy" type="date" /></label>
+          </>}
+          <label className="field field-wide">{bulk ? 'Book titles and quantities' : 'Message'}<textarea required name="message" maxLength={2500} rows={6} /></label>
         </div>
         <p className="small-note">The publisher receives your name, email and message so they can reply.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit enquiry'} <ArrowRight size={17} aria-hidden="true" /></button>
         <div role="status">{complete && <p className="feedback"><CheckCircle2 size={19} aria-hidden="true" />Your enquiry was saved for the publisher to review.</p>}</div>
       </form>
-      <aside className="order-summary"><MessageSquare size={26} strokeWidth={1.4} aria-hidden="true" /><h2>What to include</h2><p>For a book or bulk order enquiry, include the title, format and number of copies you need.</p></aside>
+      <aside className="order-summary feature-stack"><MessageSquare size={26} strokeWidth={1.4} aria-hidden="true" /><h2>{bulk ? 'Planning a bulk order?' : 'Ordering for a group?'}</h2>
+        <p>{bulk ? 'Include the editions and number of copies you need for each title.' : 'Schools, colleges and companies can request a quote for multiple copies.'}</p>
+        <Link className="button secondary" to={bulk ? '/contact' : '/contact?type=bulk'} onClick={() => setComplete(false)}>{bulk ? 'General enquiry' : 'Bulk order enquiry'}</Link>
+      </aside>
     </div>
   </section>;
 }
