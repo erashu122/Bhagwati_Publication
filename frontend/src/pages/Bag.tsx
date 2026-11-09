@@ -59,7 +59,7 @@ export function Bag({ cart, change }: { cart: Cart; change: (id: string, quantit
         <p>{booksById.get(id)?.title ?? 'An item in your bag'} is no longer available.</p>
         <button className="remove-button" type="button" onClick={() => change(id, 0)}><Trash2 size={15} aria-hidden="true" /> Remove unavailable item</button>
       </li>)}</ul>
-      <OrderSummary items={items} blocked={blocked} />
+      <OrderSummary items={items} blocked={blocked} needsShipping={items.some(item => item.book.format !== 'eBook')} />
     </div>}
     {items.length > 0 && <Link className="text-link return-link" to="/books">Continue browsing <ArrowRight size={17} aria-hidden="true" /></Link>}
   </section>;

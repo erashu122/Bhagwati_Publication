@@ -9,6 +9,7 @@ import { couponDiscount, nextOrderStatuses, orderStatusLabels } from '../../shar
 import type { Coupon, Customer, Enquiry, Order, OrderStatus, PublisherOverview, StoreOrder } from '../../shared/store.ts';
 import type { Book } from '../../shared/books.ts';
 import { canOrder } from '../../shared/books.ts';
+import { publicPages, siteOrigin } from '../../shared/site.ts';
 import { catalogRouter } from './catalog.ts';
 import { emailAdminRecovery } from './admin-recovery.ts';
 import { enquiryFields, enquirySettings, sendEnquiryEmail } from './enquiry-email.ts';
@@ -33,7 +34,7 @@ const customerFields = 'id, email, full_name AS "fullName", phone, upi_id AS "up
 const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address';
 
 app.disable('x-powered-by');
-if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
+if (onVercel || process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 app.use((_request, response, next) => {
   response.set({
     'Referrer-Policy': 'same-origin',
@@ -98,7 +99,7 @@ async function requireCustomer(request: Request, operator = false) {
 }
 
 function cookieOptions(request: Request) {
-  return { httpOnly: true, sameSite: 'lax' as const, secure: request.secure || process.env.SECURE_COOKIES === '1', path: '/' };
+  return { httpOnly: true, sameSite: 'lax' as const, secure: onVercel || request.secure || process.env.SECURE_COOKIES === '1', path: '/' };
 }
 
 async function startSession(request: Request, response: Response, id: string, loginHash?: string) {
@@ -269,7 +270,7 @@ api.post('/orders', async (request, response) => {
     }
 
     const { rows } = await tx.query<Book>(
-      'SELECT id, title, format, price, stock, published FROM books WHERE id = ANY($1::text[]) FOR SHARE',
+      'SELECT id, title, format, price, stock, published FROM books WHERE id = ANY($1::text[]) ORDER BY id FOR SHARE',
       [entries.map(([id]) => id)]
     );
     const books = new Map(rows.map(book => [book.id, book]));
@@ -395,9 +396,13 @@ api.patch('/publisher/orders/:id', async (request, response) => {
       throw new RequestError(409, 'This status change is unavailable. Refresh the dashboard.');
     }
     const reserved = order.reserved_inventory ?? [];
+    if (status === 'confirmed' || status === 'cancelled' && reserved.length) {
+      const ids = (status === 'confirmed' ? order.lines : reserved).map(line => line.id);
+      await tx.query('SELECT id FROM books WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE', [ids]);
+    }
     if (status === 'confirmed') {
       for (const line of order.lines) {
-        const { rows: [book] } = await tx.query<{ stock: number | null }>('SELECT stock FROM books WHERE id = $1 FOR UPDATE', [line.id]);
+        const { rows: [book] } = await tx.query<{ stock: number | null }>('SELECT stock FROM books WHERE id = $1', [line.id]);
         if (!book || book.stock === null) continue;
         if (book.stock < line.quantity) throw new RequestError(409, `Not enough stock to confirm ${line.title}.`);
         await tx.query('UPDATE books SET stock=stock-$2, revision=revision+1, updated_at=NOW() WHERE id=$1', [line.id, line.quantity]);
@@ -439,6 +444,15 @@ const sendError: ErrorRequestHandler = (error, _request, response, next) => {
 
 app.use('/api', api, sendError);
 
+app.get('/sitemap.xml', async (_request, response) => {
+  const { rows } = await db.query<{ id: string }>('SELECT id FROM books WHERE published ORDER BY position');
+  const paths = [...Object.keys(publicPages), ...rows.map(book => '/books/' + encodeURIComponent(book.id))];
+  response.type('xml').set('Cache-Control', 'public, max-age=300').send(
+    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    paths.map(path => `  <url><loc>${siteOrigin}${path}</loc></url>`).join('\n') + '\n</urlset>\n'
+  );
+});
+
 if (!onVercel) {
   const server = createServer(app);
   if (development) {
@@ -447,6 +461,9 @@ if (!onVercel) {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(distribution));
+    app.get([...Object.keys(publicPages), '/books/:id', '/cart', '/checkout', '/login', '/register',
+      '/forgot-password', '/account', '/notifications', '/publisher', '/admin'],
+    (_request, response) => response.sendFile(resolve(distribution, 'index.html')));
   }
 
   const port = Number(process.env.PORT || (development ? 5173 : 4000));

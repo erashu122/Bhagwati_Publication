@@ -259,7 +259,8 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
       const { rows } = await db.query('DELETE FROM categories WHERE id=$1 AND revision=$2 RETURNING id', [id, revision]);
       if (!rows.length) throw stale();
     } catch (error) {
-      if ((error as { code?: string }).code === '23503') throw new RequestError(409, 'Move the books in this category before deleting it.');
+      const code = (error as { code?: string }).code;
+      if (code === '23503' || code === '23001') throw new RequestError(409, 'Move the books in this category before deleting it.');
       throw error;
     }
     response.json({ id });

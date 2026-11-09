@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from 'react';
 import { BookOpen, Check, Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import type { Order } from '../../shared/store';
+import { homeDescription, homeTitle, publicPages, siteOrigin } from '../../shared/site';
 import { AccountProvider, RequireAccount, useAccount } from './account';
 import { CatalogProvider, CatalogReady, useCatalog } from './catalog';
 import { cartStorageKey, maxQuantity, readCart } from './cart';
@@ -34,7 +35,7 @@ function updateCart(state: CartState, action: CartAction): CartState {
     }
     return { cart, toast: null };
   }
-  const quantity = state.cart[action.id] ?? 0;
+  const quantity = Object.hasOwn(state.cart, action.id) ? state.cart[action.id] : 0;
   if (action.type === 'add') {
     if (quantity >= action.limit) return { ...state, toast: { message: `Up to ${action.limit} copies available per order.` } };
     return { cart: { ...state.cart, [action.id]: quantity + 1 }, toast: { message: 'Added to your book bag.' } };
@@ -86,6 +87,41 @@ function Footer() {
   </div></footer>;
 }
 
+function PageMetadata() {
+  const { pathname } = useLocation();
+  const { booksById, ready } = useCatalog();
+  const path = pathname.replace(/\/+$/u, '') || '/';
+  const bookPath = path.startsWith('/books/');
+  const book = bookPath ? booksById.get(path.slice('/books/'.length)) : undefined;
+  const title = book?.title ?? publicPages[path];
+  const description = book?.description || homeDescription;
+
+  useEffect(() => {
+    document.title = title && path !== '/' ? title + ' | Bhagwati Publication' : homeTitle;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const robots = document.querySelector('meta[name="robots"]');
+    if (title) {
+      robots?.remove();
+      const link = canonical ?? document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      link.setAttribute('href', siteOrigin + path);
+      if (!canonical) document.head.append(link);
+    } else if (!bookPath || ready) {
+      canonical?.remove();
+      const meta = robots ?? document.createElement('meta');
+      meta.setAttribute('name', 'robots');
+      meta.setAttribute('content', 'noindex');
+      if (!robots) document.head.append(meta);
+    } else {
+      canonical?.remove();
+      robots?.remove();
+    }
+  }, [bookPath, description, path, ready, title]);
+
+  return null;
+}
+
 export function App() {
   return <AccountProvider><CatalogProvider><CustomerExtrasProvider><Storefront /></CustomerExtrasProvider></CatalogProvider></AccountProvider>;
 }
@@ -127,6 +163,7 @@ function Storefront() {
   }} />;
 
   return <>
+    <PageMetadata />
     <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to content</a>
     <Header key={pathname} count={count} />
     <main id="main-content" tabIndex={-1}>

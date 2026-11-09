@@ -4,7 +4,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index" }
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/sitemap.xml", "destination": "/api/index" },
+    { "source": "/:page(books|author|about|contact|cart|checkout|login|register|forgot-password|account|notifications|publisher|admin)", "destination": "/index.html" },
+    { "source": "/books/:id", "destination": "/index.html" },
+    { "source": "/policies/:id(shipping|returns|privacy)", "destination": "/index.html" }
   ],
   "functions": {
     "api/*.ts": {

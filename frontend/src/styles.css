@@ -71,6 +71,11 @@ main:focus { outline: none; }
 .hero h1 { font-size: clamp(3rem, 5.05vw, 4.85rem); line-height: 1.09; }
 .hero h1 em { color: #e0c18a; font-weight: 500; }
 .hero-intro { max-width: 415px; margin: 23px 0 28px; color: #e4e4d7; font-size: 1.04rem; }
+.hero-search { display: flex; gap: 8px; max-width: 445px; }
+.hero-search input { flex: 1; min-width: 0; padding: 10px 13px; border: 1px solid #d0b885; border-radius: 5px; background: #fffdf7; color: var(--ink); font-size: .9rem; }
+.hero-search button { flex: none; }
+.hero-browse { display: inline-flex; align-items: center; gap: 8px; margin-top: 15px; color: #ebd5ab; font-size: .85rem; font-weight: 750; text-underline-offset: 4px; }
+.hero-browse:hover { text-decoration: underline; }
 .button { width: fit-content; min-height: 47px; display: inline-flex; align-items: center; justify-content: center; gap: 11px; padding: 11px 18px; border: 1px solid transparent; border-radius: 5px; font-size: .87rem; font-weight: 750; line-height: 1.35; transition: background .18s ease, color .18s ease; }
 .primary { background: var(--forest); color: #fffdf4; }
 .primary:hover { background: #2a4a38; }
@@ -89,8 +94,9 @@ main:focus { outline: none; }
 
 .benefits { border-bottom: 1px solid var(--line); background: #f1eee4; }
 .benefits-grid { display: grid; grid-template-columns: repeat(3, 1fr); padding-block: 19px; }
-.benefits-grid > div { min-height: 45px; display: flex; align-items: center; justify-content: center; gap: 13px; padding: 5px 12px; }
-.benefits-grid > div + div { border-left: 1px solid #ded6c5; }
+.benefits-grid > a { min-height: 45px; display: flex; align-items: center; justify-content: center; gap: 13px; padding: 5px 12px; }
+.benefits-grid > a + a { border-left: 1px solid #ded6c5; }
+.benefits-grid > a:hover strong { text-decoration: underline; text-underline-offset: 3px; }
 .benefits svg { flex: none; width: 23px; height: 23px; stroke-width: 1.4; color: #84642d; }
 .benefits strong, .benefits small { display: block; }
 .benefits strong { font-size: .84rem; }
@@ -296,7 +302,7 @@ main:focus { outline: none; }
   .hero-intro { margin: 15px 0 19px; font-size: .96rem; }
   .hero-display { width: min(100%, 425px); margin-top: 6px; margin-bottom: 13px; }
   .benefits-grid { padding-block: 10px; }
-  .benefits-grid > div { flex-direction: column; align-items: center; justify-content: start; gap: 5px; padding-inline: 4px; text-align: center; }
+  .benefits-grid > a { flex-direction: column; align-items: center; justify-content: start; gap: 5px; padding-inline: 4px; text-align: center; }
   .benefits svg { width: 19px; height: 19px; }
   .benefits strong { font-size: .72rem; }
   .benefits small { font-size: .65rem; }

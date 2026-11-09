@@ -20,7 +20,7 @@ export function Catalog({ add }: AddBook) {
   const sort = params.get('sort') ?? 'featured';
   const keywords = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   const results = books.filter(book => {
-    const text = (book.title + ' ' + book.author + ' ' + book.language).toLocaleLowerCase();
+    const text = [book.title, book.author, book.language, book.category, book.format].join(' ').toLocaleLowerCase();
     return (!selected || book.category === selected) && keywords.every(keyword => text.includes(keyword));
   });
 
@@ -48,7 +48,7 @@ export function Catalog({ add }: AddBook) {
       <div className="catalog-controls">
         <div className="field">
           <label htmlFor="book-search">Search the collection</label>
-          <div className="search-field"><Search size={18} aria-hidden="true" /><input id="book-search" type="search" value={query} placeholder="Title, author or language" onChange={event => updateFilter('q', event.target.value, true)} /></div>
+          <div className="search-field"><Search size={18} aria-hidden="true" /><input id="book-search" type="search" value={query} maxLength={160} placeholder="Title, author or category" onChange={event => updateFilter('q', event.target.value, true)} /></div>
         </div>
         <div className="field sort-field">
           <label htmlFor="book-sort">Sort by</label>

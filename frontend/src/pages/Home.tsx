@@ -1,5 +1,5 @@
-import { ArrowDownRight, ArrowRight, BookOpen, BriefcaseBusiness, Cpu, Feather, Languages, Lightbulb, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowDownRight, ArrowRight, BookOpen, BriefcaseBusiness, Cpu, Feather, Languages, Lightbulb, Search, UserRound } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { BookCover } from '../components/BookCover';
 import { BookCard, BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
@@ -25,7 +25,9 @@ function HeroDecoration() {
 
 export function Home({ add }: { add: (id: string) => void }) {
   const { books, categories, content, authorPhoto } = useCatalog();
+  const navigate = useNavigate();
   const featured = books.filter(book => book.featured).slice(0, 4);
+  const shelf = featured.length ? featured : books.slice(0, 4);
   const [first, second] = books;
   return <>
     <section className="hero">
@@ -34,29 +36,37 @@ export function Home({ add }: { add: (id: string) => void }) {
           <p className="eyebrow hero-label"><span /> THE BHAGWATI BOOK COLLECTION</p>
           <h1>{content.heroTitle}{content.heroAccent && <> <em>{content.heroAccent}</em></>}</h1>
           <p className="hero-intro">{content.heroIntro}</p>
-          <BrowseLink>Explore the collection</BrowseLink>
+          <form className="hero-search" role="search" aria-label="Search the collection" onSubmit={event => {
+            event.preventDefault();
+            const query = String(new FormData(event.currentTarget).get('q') ?? '').trim();
+            navigate(query ? '/books?q=' + encodeURIComponent(query) : '/books');
+          }}>
+            <input aria-label="Book title, author or category" name="q" type="search" maxLength={160} placeholder="Title, author or category" />
+            <button className="button primary" type="submit"><Search size={17} aria-hidden="true" /> Search</button>
+          </form>
+          <Link className="hero-browse" to="/books">Browse all books <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
         <div className="hero-display">
           <HeroDecoration />
-          {second && <div className="hero-book hero-book-back"><BookCover book={second} /></div>}
-          {first && <div className="hero-book hero-book-front"><BookCover book={first} /></div>}
+          {second && <Link to={'/books/' + second.id} aria-label={'View ' + second.title} className="hero-book hero-book-back"><BookCover book={second} /></Link>}
+          {first && <Link to={'/books/' + first.id} aria-label={'View ' + first.title} className="hero-book hero-book-front"><BookCover book={first} /></Link>}
           {first && <div className="hero-caption"><span /> FROM THE COLLECTION <span /></div>}
         </div>
       </div>
     </section>
-    <section className="benefits" aria-label="About the collection">
+    <nav className="benefits" aria-label="Collection shortcuts">
       <div className="container benefits-grid">
-        <div><BookOpen aria-hidden="true" /><span><strong>A books-only collection</strong><small>Browse the catalog</small></span></div>
-        <div><Languages aria-hidden="true" /><span><strong>Print and digital</strong><small>Explore books in different formats</small></span></div>
-        <div><Sparkles aria-hidden="true" /><span><strong>Browse by interest</strong><small>Find your next read</small></span></div>
+        <Link to="/books"><BookOpen aria-hidden="true" /><span><strong>Explore the collection</strong><small>Print and digital editions</small></span></Link>
+        <Link to="/books?q=Hindi"><Languages aria-hidden="true" /><span><strong>Hindi books</strong><small>Read in Hindi</small></span></Link>
+        <Link to="/author"><UserRound aria-hidden="true" /><span><strong>Meet the author</strong><small>Discover their books</small></span></Link>
       </div>
-    </section>
-    {featured.length > 0 && <section className="container section featured">
+    </nav>
+    {shelf.length > 0 && <section className="container section featured">
       <div className="section-heading">
-        <div><p className="eyebrow"><span className="diamond" /> THE BOOKSHELF</p><h2>Featured collection</h2><p>Start with titles from across our collection.</p></div>
+        <div><p className="eyebrow"><span className="diamond" /> THE BOOKSHELF</p><h2>{featured.length ? 'Featured collection' : 'From the collection'}</h2><p>Start with titles from across our collection.</p></div>
         <Link className="text-link" to="/books">View all books <ArrowRight size={17} aria-hidden="true" /></Link>
       </div>
-      <div className="book-grid">{featured.map(book => <BookCard key={book.id} book={book} add={add} />)}</div>
+      <div className="book-grid">{shelf.map(book => <BookCard key={book.id} book={book} add={add} />)}</div>
     </section>}
     {categories.length > 0 && <section className="category-section section">
       <div className="container">
