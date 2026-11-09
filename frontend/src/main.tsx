@@ -9,11 +9,19 @@ import { App } from './App';
 import './styles.css';
 
 // Preserve bookmarks and recovery links shared before the store used direct URLs.
-const legacyRoute = window.location.hash.slice(1);
-if (window.location.pathname === '/' && /^\/(?![\\/\s])/u.test(legacyRoute)) {
+function moveLegacyRoute() {
+  const legacyRoute = window.location.hash.slice(1);
+  if (window.location.pathname !== '/' || !/^\/(?![\\/\s])/u.test(legacyRoute)) return false;
   const destination = new URL(legacyRoute, window.location.origin);
-  if (destination.origin === window.location.origin) history.replaceState(history.state, '', destination.href);
+  if (destination.origin !== window.location.origin) return false;
+  history.replaceState(history.state, '', destination.href);
+  return true;
 }
+
+moveLegacyRoute();
+window.addEventListener('hashchange', () => {
+  if (moveLegacyRoute()) window.dispatchEvent(new PopStateEvent('popstate'));
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode><BrowserRouter><App /></BrowserRouter></StrictMode>
