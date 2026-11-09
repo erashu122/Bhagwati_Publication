@@ -33,7 +33,7 @@ export function Home({ add }: { add: (id: string) => void }) {
     <section className="hero">
       <div className="container hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow hero-label"><span /> THE BHAGWATI BOOK COLLECTION</p>
+          <p className="eyebrow hero-label"><span className="diamond" /> THE BHAGWATI BOOK COLLECTION</p>
           <h1>{content.heroTitle}{content.heroAccent && <> <em>{content.heroAccent}</em></>}</h1>
           <p className="hero-intro">{content.heroIntro}</p>
           <form className="hero-search" role="search" aria-label="Search the collection" onSubmit={event => {
@@ -41,17 +41,19 @@ export function Home({ add }: { add: (id: string) => void }) {
             const query = String(new FormData(event.currentTarget).get('q') ?? '').trim();
             navigate(query ? '/books?q=' + encodeURIComponent(query) : '/books');
           }}>
-            <input aria-label="Book title, author or category" name="q" type="search" maxLength={160} placeholder="Title, author or category" />
+            <input aria-label="Book title, author or category" name="q" type="search" maxLength={160} placeholder="Title, author, topic" />
             <button className="button primary" type="submit"><Search size={17} aria-hidden="true" /> Search</button>
           </form>
           <Link className="hero-browse" to="/books">Browse all books <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
-        <div className="hero-display">
+        {first && <div className="hero-display">
           <HeroDecoration />
+          <div className="hero-shelf-label"><span>THE BOOKSHELF</span><span>01 / THE COLLECTION</span></div>
+          <img className="hero-imprint" src="/be-mark.svg" width="48" height="48" alt="BE" />
           {second && <Link to={'/books/' + second.id} aria-label={'View ' + second.title} className="hero-book hero-book-back"><BookCover book={second} /></Link>}
-          {first && <Link to={'/books/' + first.id} aria-label={'View ' + first.title} className="hero-book hero-book-front"><BookCover book={first} /></Link>}
-          {first && <div className="hero-caption"><span /> FROM THE COLLECTION <span /></div>}
-        </div>
+          <Link to={'/books/' + first.id} aria-label={'View ' + first.title} className="hero-book hero-book-front"><BookCover book={first} /></Link>
+          <div className="hero-caption"><span /> PRINT &amp; DIGITAL EDITIONS <span /></div>
+        </div>}
       </div>
     </section>
     <nav className="benefits" aria-label="Collection shortcuts">
