@@ -16,6 +16,8 @@ Copy `.env.example` to `.env` to override defaults. The default PGlite directory
 
 Use HTTPS and `SECURE_COOKIES=1` before exposing accounts beyond local development. Set `TRUST_PROXY=1` only when the app is behind exactly one trusted reverse proxy that sanitizes forwarding headers. Bind the process locally unless the hosting arrangement requires another interface.
 
+To recover the `admin` sign-in, point the operator command at the store's database and run `npm run operator -- --issue-admin-recovery`. Enter the code in **Forgot password?** on the same store. It expires after 30 minutes, replaces any previous code, and can be used once. Setting the new password signs the admin out of existing sessions.
+
 ## Connect to PostgreSQL with pgAdmin
 
 1. Connect to the existing local PostgreSQL server in pgAdmin. Under **Login/Group Roles**, create `bhagwati_app`. Set a password on **Definition** and turn on **Can login?** under **Privileges**. Leave the cluster-wide admin privileges off.

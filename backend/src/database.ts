@@ -18,6 +18,11 @@ export async function initializeSchema(tx: DatabaseExecutor, seed = true) {
       expires_at TIMESTAMPTZ NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS admin_recovery (
+      singleton BOOLEAN PRIMARY KEY CHECK (singleton),
+      token_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS orders (
       id UUID PRIMARY KEY,
       customer_id UUID NOT NULL REFERENCES customers(id),

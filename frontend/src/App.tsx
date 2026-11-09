@@ -13,7 +13,7 @@ import { BookDetails, Catalog } from './pages/Books';
 import { Home } from './pages/Home';
 import { Author } from './pages/Author';
 import { About, Contact, NotFound, Policy } from './pages/Information';
-import { Dashboard, SignIn } from './pages/Account';
+import { Dashboard, ResetAdminPassword, SignIn } from './pages/Account';
 import { Publisher } from './pages/Publisher';
 
 const navLinks = [['/', 'Home'], ['/books', 'All Books'], ['/about', 'Our Story'], ['/contact', 'Contact']];
@@ -131,6 +131,7 @@ function Storefront() {
         <Route path="/cart" element={<CatalogReady><Bag cart={cart} change={change} /></CatalogReady>} />
         <Route path="/checkout" element={<CatalogReady>{count ? <RequireAccount checkout>{checkout}</RequireAccount> : checkout}</CatalogReady>} />
         <Route path="/login" element={<SignIn key="login" register={false} />} />
+        <Route path="/forgot-password" element={<ResetAdminPassword />} />
         <Route path="/register" element={<SignIn key="register" register />} />
         <Route path="/account" element={<RequireAccount>{customer && <Dashboard key={customer.id} customer={customer} cartCount={count} />}</RequireAccount>} />
         <Route path="/publisher" element={<RequireAccount operator><Publisher /></RequireAccount>} />

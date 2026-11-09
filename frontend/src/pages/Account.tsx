@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, LayoutGrid, LogOut, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, Eye, EyeOff, LayoutGrid, LogOut, MapPin, Package, ShieldCheck, ShoppingBag, UserRound } from 'lucide-react';
 import { Link, Navigate, useNavigate, useSearchParams, createSearchParams } from 'react-router-dom';
 import type { Customer, Order } from '../../../shared/store';
 import { AccountLoading, errorMessage, StoreError, storeRequest, useAccount } from '../account';
@@ -9,6 +9,27 @@ import { BookCover } from '../components/BookCover';
 import { OrderCard, orderReference } from '../components/OrderCard';
 import { BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
+
+function PasswordField({ label = 'Password', name = 'password', create = false }: {
+  label?: string;
+  name?: string;
+  create?: boolean;
+}) {
+  const id = useId();
+  const [visible, setVisible] = useState(false);
+  return <div className="field">
+    <label htmlFor={id}>{label}</label>
+    <div className="password-input">
+      <input id={id} required name={name} type={visible ? 'text' : 'password'} maxLength={128}
+        minLength={create ? 12 : undefined} autoComplete={create ? 'new-password' : 'current-password'}
+        autoCapitalize="none" spellCheck={false} />
+      <button type="button" aria-controls={id} aria-label={visible ? 'Hide ' + label.toLowerCase() : 'Show ' + label.toLowerCase()}
+        onClick={() => setVisible(value => !value)}>
+        {visible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+      </button>
+    </div>
+  </div>;
+}
 
 export function SignIn({ register }: { register: boolean }) {
   const { customer, setCustomer, loading, error: sessionError } = useAccount();
@@ -60,16 +81,59 @@ export function SignIn({ register }: { register: boolean }) {
           <input required name="email" type={register ? 'email' : 'text'} maxLength={254}
             autoComplete={register ? 'email' : 'username'} autoCapitalize="none" spellCheck={false} />
         </label>
-        <label className="field">Password<input required name="password" type="password" maxLength={128}
-          minLength={register ? 12 : undefined} autoComplete={register ? 'new-password' : 'current-password'} />
-          {register && <small>Use at least 12 characters.</small>}
-        </label>
+        <PasswordField create={register} />
+        {register ? <p className="small-note">Use at least 12 characters.</p>
+          : <Link className="text-link forgot-password" to="/forgot-password">Forgot password?</Link>}
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Please wait…' : register ? 'Create account' : 'Sign in'} <ArrowRight size={17} aria-hidden="true" /></button>
       </form>
       <p className="auth-switch">{register ? 'Already have an account?' : 'New to Bhagwati Publication?'}{' '}
         <Link className="text-link" to={(register ? '/login' : '/register') + (fromCheckout ? '?next=checkout' : '')}>{register ? 'Sign in' : 'Create an account'}</Link>
       </p>
+    </div>
+  </section>;
+}
+
+export function ResetAdminPassword() {
+  const { setCustomer } = useAccount();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [complete, setComplete] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    setBusy(true);
+    setError('');
+    try {
+      await storeRequest('/admin/password-reset', 'POST', values);
+      setCustomer(null);
+      setComplete(true);
+    } catch (error) {
+      setError(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section className="container section">
+    <div className="auth-form recovery-form">
+      <p className="eyebrow"><ShieldCheck size={16} aria-hidden="true" /> PUBLISHER ACCESS</p>
+      <h1>{complete ? 'Password updated' : 'Reset admin password'}</h1>
+      {complete ? <p className="feedback" role="status"><CheckCircle2 size={18} aria-hidden="true" /> Sign in with the ID <strong>admin</strong> and your new password.</p>
+        : <>
+          <p className="page-intro">Use the one-time recovery code from the store owner. Your admin ID is <strong>admin</strong>.</p>
+          <form className="form-stack" onSubmit={submit}>
+            <label className="field">Recovery code<input name="code" required type="password" maxLength={64}
+              autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} /></label>
+            <PasswordField label="New password" create />
+            <PasswordField label="Confirm password" name="confirmPassword" create />
+            <p className="small-note">Use at least 12 characters.</p>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <button className="button primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Set new password'} <ArrowRight size={17} aria-hidden="true" /></button>
+          </form>
+        </>}
+      <p className="auth-switch"><Link className="text-link" to="/login?next=admin">Back to admin sign-in</Link></p>
     </div>
   </section>;
 }

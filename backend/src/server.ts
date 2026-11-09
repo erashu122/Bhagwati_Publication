@@ -89,10 +89,14 @@ function cookieOptions(request: Request) {
   return { httpOnly: true, sameSite: 'lax' as const, secure: request.secure || process.env.SECURE_COOKIES === '1', path: '/' };
 }
 
-async function startSession(request: Request, response: Response, id: string) {
+async function startSession(request: Request, response: Response, id: string, loginHash?: string) {
   const token = randomBytes(32).toString('hex');
   const previous = sessionToken(request);
   await db.transaction(async tx => {
+    if (loginHash !== undefined) {
+      const { rows } = await tx.query<{ password: string }>('SELECT password FROM customers WHERE id = $1 FOR UPDATE', [id]);
+      if (rows[0]?.password !== loginHash) throw new RequestError(401, 'Sign-in ID or password is incorrect.');
+    }
     await tx.query('DELETE FROM sessions WHERE expires_at <= NOW() OR token_hash = $1', [previous ? digest(previous) : '']);
     await tx.query(
       'INSERT INTO sessions (token_hash, customer_id, expires_at) VALUES ($1, $2, $3)',
@@ -136,8 +140,35 @@ api.post('/login', authLimit, async (request, response) => {
   const valid = await verifyPassword(password, account?.password);
   if (!account || !valid) throw new RequestError(401, 'Sign-in ID or password is incorrect.');
   const { password: _storedPassword, ...customer } = account;
-  await startSession(request, response, customer.id);
+  await startSession(request, response, customer.id, _storedPassword);
   response.json({ customer });
+});
+
+api.post('/admin/password-reset', authLimit, async (request, response) => {
+  const body = record(request.body);
+  const code = field(body.code, 'recovery code', 64).toLowerCase();
+  if (!/^[a-f0-9]{64}$/u.test(code)) throw new RequestError(400, 'The recovery code is invalid, expired or already used.');
+  const password = passwordField(body.password, true);
+  if (password !== body.confirmPassword) throw new RequestError(400, 'The passwords do not match.');
+
+  await db.transaction(async tx => {
+    const claimed = await tx.query(`
+      DELETE FROM admin_recovery WHERE singleton = TRUE AND token_hash = $1 AND expires_at > NOW()
+      RETURNING singleton
+    `, [digest(code)]);
+    if (!claimed.rows.length) throw new RequestError(400, 'The recovery code is invalid, expired or already used.');
+
+    const { rows: [admin] } = await tx.query<{ id: string }>(`
+      INSERT INTO customers (id, email, full_name, password, operator)
+      VALUES ($1, $2, 'Store Admin', $3, TRUE)
+      ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password WHERE customers.operator
+      RETURNING id
+    `, [randomUUID(), adminAccountEmail, await passwordHash(password)]);
+    if (!admin) throw new RequestError(409, 'The store owner must resolve an admin account conflict.');
+    await tx.query('DELETE FROM sessions WHERE customer_id = $1', [admin.id]);
+  });
+
+  response.clearCookie(cookieName, cookieOptions(request)).json({ ok: true });
 });
 
 api.post('/logout', async (request, response) => {
