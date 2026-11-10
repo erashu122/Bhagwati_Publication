@@ -8,7 +8,7 @@ import { WishlistButton } from '../customer-extras';
 export function Brand({ imprint = false }: { imprint?: boolean }) {
   return <Link className={imprint ? 'brand brand-imprint' : 'brand'} to="/" aria-label="Bhagwati Publication home">
     {imprint
-      ? <img className="brand-mark" src="/be-mark.svg" width="48" height="48" alt="" />
+      ? <img className="brand-mark" src="/bp-mark.svg" width="48" height="48" alt="" />
       : <img className="brand-logo" src="/bhagwati-logo.jpg" width="940" height="627" alt="भगवती प्रकाशन, दिल्ली" />}
     <span className="brand-wordmark">
       <span className="brand-name">Bhagwati<br />Publication</span>
