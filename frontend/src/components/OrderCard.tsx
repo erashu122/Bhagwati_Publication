@@ -21,12 +21,13 @@ export function OrderCard({ order, children }: { order: Order; children?: ReactN
       <span>{line.title} <small>{line.format} · {line.quantity} {line.quantity === 1 ? 'copy' : 'copies'}</small></span>
       <strong>{formatPrice(line.unitPrice * line.quantity)}</strong>
     </li>)}</ul>
-    <div className="order-card-total"><span>Estimated book subtotal</span><strong>{formatPrice(order.estimatedSubtotal)}</strong></div>
+    <div className="order-card-total"><span>{order.paymentMethod ? 'Book subtotal' : 'Estimated book subtotal'}</span><strong>{formatPrice(order.estimatedSubtotal)}</strong></div>
     {order.couponCode && <>
       <div className="order-card-total"><span>Coupon {order.couponCode}</span><strong>−{formatPrice(order.discount)}</strong></div>
       <div className="order-card-total"><span>After discount</span><strong>{formatPrice(order.estimatedSubtotal - order.discount)}</strong></div>
     </>}
-    {order.finalTotal != null && <div className="order-card-total"><span>{order.refundedAt ? 'Refunded' : order.paidAt ? 'Payment received' : 'Final total'}</span><strong>{formatPrice(order.finalTotal)}</strong></div>}
+    {order.shippingFee != null && <div className="order-card-total"><span>Shipping</span><strong>{formatPrice(order.shippingFee)}</strong></div>}
+    {order.finalTotal != null && <div className="order-card-total"><span>{order.refundedAt ? 'Refunded' : order.paidAt ? 'Payment received' : order.status !== 'cancelled' && order.paymentMethod === 'cod' ? 'Due on delivery' : 'Order total'}</span><strong>{formatPrice(order.finalTotal)}</strong></div>}
     {order.address ? <details className="order-address"><summary><MapPin size={16} aria-hidden="true" /> Delivery address</summary>
       <p>{order.address.fullName}<br />{order.address.street}<br />{order.address.city}, {order.address.state} {order.address.pin}<br />{order.address.phone}</p>
     </details> : <p className="digital-note"><BookOpen size={16} aria-hidden="true" /> Digital titles · No shipping address needed</p>}

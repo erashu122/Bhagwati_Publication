@@ -88,8 +88,7 @@ export async function initializeSchema(tx: DatabaseExecutor, seed = true) {
     );
   `);
   const { rows } = await tx.query("INSERT INTO store_migrations (name) VALUES ('commerce-v1') ON CONFLICT DO NOTHING RETURNING name");
-  if (!rows.length) return;
-  await tx.exec(`
+  if (rows.length) await tx.exec(`
     ALTER TABLE books DROP CONSTRAINT books_format_check;
     ALTER TABLE books ADD CHECK (format IN ('eBook', 'Paperback', 'Hardcover', 'Bundle'));
     ALTER TABLE books ADD COLUMN component_ids TEXT[];
@@ -118,6 +117,15 @@ export async function initializeSchema(tx: DatabaseExecutor, seed = true) {
         FROM orders o CROSS JOIN LATERAL jsonb_array_elements(o.lines) AS line
         CROSS JOIN LATERAL jsonb_array_elements(jsonb_build_array(line) || COALESCE(line->'components', '[]'::jsonb)) AS item
        WHERE o.paid_at IS NOT NULL AND o.status <> 'cancelled';
+  `);
+  const checkout = await tx.query("INSERT INTO store_migrations (name) VALUES ('checkout-v1') ON CONFLICT DO NOTHING RETURNING name");
+  if (checkout.rows.length) await tx.exec(`
+    ALTER TABLE orders DROP CONSTRAINT orders_status_check;
+    ALTER TABLE orders ADD CHECK (status IN ('submitted', 'awaiting_payment', 'confirmed', 'shipped', 'completed', 'cancelled'));
+    ALTER TABLE orders ADD COLUMN payment_method TEXT CHECK (payment_method IN ('online', 'upi', 'cod'));
+    ALTER TABLE orders ADD COLUMN shipping_fee INTEGER CHECK (shipping_fee BETWEEN 0 AND 10000);
+    ALTER TABLE orders ADD COLUMN payment_expires_at TIMESTAMPTZ;
+    CREATE INDEX orders_checkout_expiry_idx ON orders (payment_expires_at) WHERE status = 'awaiting_payment';
   `);
 }
 

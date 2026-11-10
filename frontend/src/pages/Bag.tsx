@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowRight, BookOpen, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, BookOpen, CreditCard, Minus, Plus, QrCode, Trash2, Truck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { couponDiscount } from '../../../shared/store';
 import { bookQuote, needsDelivery } from '../../../shared/books';
-import type { Coupon, Order } from '../../../shared/store';
+import type { CheckoutConfig, Coupon, Order, PaymentMethod } from '../../../shared/store';
 import { errorMessage, StoreError, storeRequest, useAccount } from '../account';
 import { AddressFields, readAddress } from '../components/AddressFields';
 import { cartItems, maxQuantity } from '../cart';
@@ -14,8 +14,8 @@ import { BookCover } from '../components/BookCover';
 import { EmptyBag } from '../components/Storefront';
 import { canOrder, formatPrice } from '../data/books';
 
-function OrderSummary({ items, checkout = false, needsShipping = true, blocked = false, coupon }: {
-  items: ReturnType<typeof cartItems>; checkout?: boolean; needsShipping?: boolean; blocked?: boolean; coupon?: Coupon;
+function OrderSummary({ items, checkout = false, shipping, blocked = false, coupon }: {
+  items: ReturnType<typeof cartItems>; checkout?: boolean; shipping?: number; blocked?: boolean; coupon?: Coupon;
 }) {
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const discount = coupon ? couponDiscount(subtotal, coupon.percent) : 0;
@@ -24,11 +24,11 @@ function OrderSummary({ items, checkout = false, needsShipping = true, blocked =
     {checkout && <ul className="summary-items">{items.map(({ book, quantity, total }) => <li key={book.id}>
       <span lang={book.language === 'Hindi' ? 'hi' : 'en'}>{book.title} × {quantity}</span><span>{formatPrice(total)}</span>
     </li>)}</ul>}
-    <dl><div><dt>Estimated book subtotal</dt><dd>{formatPrice(subtotal)}</dd></div>
+    <dl><div><dt>Book subtotal</dt><dd>{formatPrice(subtotal)}</dd></div>
     {coupon && <><div><dt>{coupon.code} ({coupon.percent}% off)</dt><dd>−{formatPrice(discount)}</dd></div>
       <div><dt>After discount</dt><dd>{formatPrice(subtotal - discount)}</dd></div></>}
-    <div><dt>Shipping</dt><dd>{!needsShipping ? 'Not required' : 'Pending confirmation'}</dd></div>
-    {checkout && <div><dt>Tax</dt><dd>Pending confirmation</dd></div>}</dl>
+    <div><dt>Shipping</dt><dd>{shipping === undefined ? 'Shown at checkout' : shipping === 0 ? 'Free' : formatPrice(shipping)}</dd></div>
+    {checkout && shipping !== undefined && <div className="checkout-total"><dt>Order total</dt><dd>{formatPrice(subtotal - discount + shipping)}</dd></div>}</dl>
     {!checkout && (blocked ? <p className="small-note checkout-note">Review the items in your bag before continuing.</p> : <Link className="button primary" to="/checkout">Continue to checkout <ArrowRight size={17} aria-hidden="true" /></Link>)}
   </aside>;
 }
@@ -60,7 +60,7 @@ export function Bag({ cart, change }: { cart: Cart; change: (id: string, quantit
         <p>{booksById.get(id)?.title ?? 'An item in your bag'} is no longer available.</p>
         <button className="remove-button" type="button" onClick={() => change(id, 0)}><Trash2 size={15} aria-hidden="true" /> Remove unavailable item</button>
       </li>)}</ul>
-      <OrderSummary items={items} blocked={blocked} needsShipping={items.some(item => needsDelivery(item.book))} />
+      <OrderSummary items={items} blocked={blocked} shipping={items.some(item => needsDelivery(item.book)) ? undefined : 0} />
     </div>}
     {items.length > 0 && <Link className="text-link return-link" to="/books">Continue browsing <ArrowRight size={17} aria-hidden="true" /></Link>}
   </section>;
@@ -99,9 +99,28 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
   const [selectedCode, setSelectedCode] = useState('');
   const [couponError, setCouponError] = useState('');
   const [reloadCoupons, setReloadCoupons] = useState(0);
+  const [config, setConfig] = useState<CheckoutConfig>();
+  const [configError, setConfigError] = useState('');
+  const [reloadConfig, setReloadConfig] = useState(0);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>();
   const activeCoupon = coupons.find(coupon => coupon.code === selectedCode);
   const needsShipping = items.some(item => needsDelivery(item.book));
+  const hasDigital = items.some(({ book }) => book.format === 'eBook' || book.bundle?.some(item => item.format === 'eBook'));
+  const shipping = needsShipping ? config?.shippingFee : 0;
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const total = subtotal - (activeCoupon ? couponDiscount(subtotal, activeCoupon.percent) : 0) + (shipping ?? 0);
+  const canPayOnline = Boolean(config?.enabled || total === 0);
+  const method = selectedMethod === 'cod' && !hasDigital || selectedMethod && selectedMethod !== 'cod' && canPayOnline
+    ? selectedMethod : canPayOnline ? 'online' : !hasDigital ? 'cod' : undefined;
   const customerId = customer?.id;
+
+  useEffect(() => {
+    let current = true;
+    setConfigError('');
+    storeRequest<CheckoutConfig>('/payments/config').then(result => { if (current) setConfig(result); })
+      .catch(error => { if (current) setConfigError(errorMessage(error)); });
+    return () => { current = false; };
+  }, [reloadConfig]);
 
   useEffect(() => {
     if (!customerId) return;
@@ -117,7 +136,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!customer || blocked || sending.current) return;
+    if (!customer || blocked || sending.current || !config || !method) return;
     const form = new FormData(event.currentTarget);
     const saveAddress = needsShipping && form.get('saveAddress') === 'on';
     sending.current = true;
@@ -131,7 +150,9 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
         requestKey: request.current.key,
         address: needsShipping ? readAddress(form) : null,
         saveAddress,
-        coupon: activeCoupon && { code: activeCoupon.code, percent: activeCoupon.percent }
+        coupon: activeCoupon && { code: activeCoupon.code, percent: activeCoupon.percent },
+        paymentMethod: method,
+        total
       });
       try {
         sessionStorage.removeItem('bhagwati.checkout.' + customer.id);
@@ -140,6 +161,10 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
       }
       if (saveAddress && order.address) setCustomer({ ...customer, address: order.address });
       complete(order);
+      if (order.status === 'awaiting_payment') {
+        const payment = await storeRequest<{ url?: string }>('/orders/' + order.id + '/payment', 'POST', {}).catch(() => null);
+        if (payment?.url) { window.location.assign(payment.url); return; }
+      }
       navigate('/account?order=' + order.id, { replace: true });
     } catch (error) {
       if (error instanceof StoreError && error.status === 401) setCustomer(null);
@@ -147,6 +172,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
         setError(errorMessage(error));
         if (error instanceof StoreError && error.status === 409) {
           setReloadCoupons(value => value + 1);
+          setReloadConfig(value => value + 1);
           await refresh();
         }
       }
@@ -161,7 +187,7 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
     {blocked ? <div className="empty-panel"><h2>Review your book bag</h2><p>Some books or quantities are unavailable.</p><Link className="button primary" to="/cart">Return to bag</Link></div>
       : items.length === 0 ? <EmptyBag /> : customer && <>
       <ol className="checkout-steps" aria-label="Checkout progress">
-        <li><span>1</span> Book bag</li><li><span>2</span> Account</li><li aria-current="step"><span>3</span> Delivery &amp; review</li>
+        <li><span>1</span> Book bag</li><li><span>2</span> Account</li><li aria-current="step"><span>3</span> Delivery &amp; payment</li><li><span>4</span> Confirmation</li>
       </ol>
       <div className="order-grid">
         <form className="form-panel checkout-form" onSubmit={submit}>
@@ -179,11 +205,26 @@ export function Checkout({ cart, complete }: { cart: Cart; complete: (order: Ord
             </select>
           </label>
           {couponError && <p className="form-error" role="alert">{couponError} <button className="text-link" type="button" onClick={() => setReloadCoupons(value => value + 1)}>Retry coupons</button></p>}
-          <p className="checkout-note">The publisher will confirm availability and the final total. Open My orders to pay after confirmation.</p>
+          {config ? <>
+            {total === 0 ? <p className="checkout-note">No payment is due. Your invoice will be available in My orders.</p> : <fieldset className="checkout-methods" disabled={busy}>
+              <legend>Choose how to pay</legend>
+              {([
+                ['online', CreditCard, 'Pay online', 'Credit card, debit card, net banking or UPI', !config.enabled],
+                ['upi', QrCode, 'UPI / QR', 'Scan on desktop or pay with a UPI app on mobile', !config.enabled],
+                ['cod', Truck, 'Cash on Delivery', hasDigital ? 'Available only for print books' : 'Pay when your books arrive', hasDigital]
+              ] as const).map(([value, Icon, title, detail, disabled]) => <label className="checkout-method" key={value}>
+                <input type="radio" name="paymentMethod" value={value} checked={method === value} disabled={disabled} onChange={() => setSelectedMethod(value)} />
+                <Icon size={21} aria-hidden="true" /><span><strong>{title}</strong><small>{detail}</small></span>
+              </label>)}
+            </fieldset>}
+            {!config.enabled && total > 0 && <p className="checkout-note">Online payment is currently unavailable.</p>}
+            {config.enabled && method !== 'cod' && total > 0 && <p className="checkout-note">You’ll pay on Razorpay. Your order is confirmed and your invoice becomes available once payment is verified.</p>}
+          </> : configError ? <p className="form-error" role="alert">{configError} <button className="text-link" type="button" onClick={() => setReloadConfig(value => value + 1)}>Retry payment options</button></p>
+            : <p role="status">Loading payment options…</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="button primary" disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit order request'} <ArrowRight size={17} aria-hidden="true" /></button>
+          <button className="button primary" disabled={busy || !config || !method} type="submit">{busy ? 'Preparing checkout…' : total === 0 ? 'Place order' : method === 'cod' ? 'Place COD order' : 'Continue to payment'} <ArrowRight size={17} aria-hidden="true" /></button>
         </form>
-        <OrderSummary items={items} checkout needsShipping={needsShipping} coupon={activeCoupon} />
+        <OrderSummary items={items} checkout shipping={shipping} coupon={activeCoupon} />
       </div>
     </>}
   </section>;

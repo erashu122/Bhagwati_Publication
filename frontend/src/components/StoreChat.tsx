@@ -32,7 +32,7 @@ function answerQuestion(query: string, books: Book[], currentBook?: Book): Answe
     books: [...new Set(matches)].slice(0, 3)
   };
   if (/\b(track|order|orders|status)\b|ऑर्डर/u.test(text)) return reply(
-    'Open My orders after signing in to check the status of an order request.',
+    'Open My orders after signing in to track your order and find its payment receipt.',
     'साइन इन करके My orders में अपने ऑर्डर की स्थिति देखें।', 'My orders', '/account?tab=orders'
   );
   if (/coupon|discount|offer|कूपन|छूट/u.test(text)) return reply(
@@ -40,12 +40,12 @@ function answerQuestion(query: string, books: Book[], currentBook?: Book): Answe
     'अपने अकाउंट में सक्रिय कूपन देखें। किताबों पर छूट के लिए checkout में एक कूपन चुनें।', 'My coupons', '/account?tab=coupons'
   );
   if (/upi|payment|pay\b|भुगतान|पेमेंट/u.test(text)) return reply(
-    'You can save a UPI ID in Payments & UPI. The publisher provides payment instructions after confirming the order.',
-    'Payments & UPI में अपना UPI ID सेव करें। ऑर्डर कन्फर्म होने के बाद प्रकाशक भुगतान की जानकारी देगा।', 'Payments & UPI', '/account?tab=payment'
+    'See available payment methods at checkout. Cash on Delivery is for printed books only. Your receipt is in My orders after payment is confirmed.',
+    'Checkout पर उपलब्ध भुगतान विकल्प देखें। COD केवल प्रिंट किताबों के लिए है। भुगतान की पुष्टि के बाद रसीद My orders में मिलेगी।', 'My orders', '/account?tab=orders'
   );
   if (/shipping|delivery|ship\b|डिलीवरी/u.test(text)) return reply(
-    'The publisher confirms shipping costs before fulfillment. eBooks do not need a delivery address.',
-    'प्रकाशक भेजने से पहले शिपिंग शुल्क कन्फर्म करता है। ईबुक के लिए डिलीवरी पता ज़रूरी नहीं है।', 'Shipping policy', '/policies/shipping'
+    'Print book shipping is shown at checkout. eBooks do not need a delivery address.',
+    'प्रिंट किताबों की शिपिंग checkout पर दिखती है। ईबुक के लिए डिलीवरी पता ज़रूरी नहीं है।', 'Shipping policy', '/policies/shipping'
   );
   if (/returns?|refund|वापसी/u.test(text)) return reply(
     'Check the returns policy, or contact the publisher about an existing request.',

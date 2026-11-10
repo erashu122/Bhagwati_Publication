@@ -158,15 +158,17 @@ function Operations({ enquiries, initialStatus }: { enquiries: boolean; initialS
           {enquiry.emailStatus === 'failed' ? 'Retry email' : 'Send email to contact inbox'}
         </button>}
       </article>)}</div>
-      : <div className="account-orders">{orders.length === 0 && <p>No order requests found.</p>}{orders.map(order => <OrderCard order={order} key={order.id}>
+      : <div className="account-orders">{orders.length === 0 && <p>No orders found.</p>}{orders.map(order => <OrderCard order={order} key={order.id}>
         <p className="operator-customer">{order.fullName} · {order.email}</p>
         <PublisherPayment order={order} disabled={busy} update={patch => setData(previous => previous && {
           ...previous, orders: previous.orders.map(item => item.id === order.id ? { ...item, ...patch } : item)
         })} />
         <div className="inline-actions">{nextOrderStatuses(order).filter(status => status === 'cancelled'
           ? order.refundedAt || (!order.paidAt && !order.paymentLinkId)
-          : status === 'confirmed' || order.finalTotal == null || order.paidAt).map(status => <button className={'button ' + (status === 'cancelled' ? 'secondary' : 'primary')} disabled={busy} type="button" key={status} onClick={() => void update(order.id, status)}>
-          {status === 'cancelled' ? 'Cancel request' : status === 'confirmed' ? 'Confirm request' : 'Mark ' + orderStatusLabels[status].toLowerCase()}
+          : status === 'confirmed' || status === 'shipped' && order.paymentMethod === 'cod' || order.finalTotal == null || order.paidAt).map(status => <button className={'button ' + (status === 'cancelled' ? 'secondary' : 'primary')} disabled={busy} type="button" key={status} onClick={() => {
+          if (order.status !== 'shipped' || status !== 'cancelled' || window.confirm('Have the undelivered books been returned to stock?')) void update(order.id, status);
+        }}>
+          {status === 'cancelled' ? 'Cancel order' : status === 'confirmed' ? 'Confirm request' : 'Mark ' + orderStatusLabels[status].toLowerCase()}
         </button>)}</div>
       </OrderCard>)}</div>}
   </>;

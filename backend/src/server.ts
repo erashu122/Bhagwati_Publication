@@ -15,7 +15,8 @@ import { emailAdminRecovery } from './admin-recovery.ts';
 import { enquiryFields, enquirySettings, sendEnquiryEmail } from './enquiry-email.ts';
 import { couponCode, customerFeatures, notifyOrder } from './customer-features.ts';
 import { openDatabase } from './database.ts';
-import { paymentsRouter, razorpayWebhook } from './payments.ts';
+import { checkoutConfig, expireUnstartedCheckouts, paymentsRouter, razorpayWebhook } from './payments.ts';
+import { orderDocument } from './invoice.ts';
 import { readingRouter } from './reading.ts';
 import { adminAccountEmail, adminLogin, cookieName, digest, passwordHash, sessionLength, sessionToken, verifyPassword } from './security.ts';
 import { addressField, cartEntries, emailField, field, passwordField, phoneField, record, RequestError, uuidField } from './validation.ts';
@@ -33,7 +34,7 @@ const app = express();
 const api = express.Router();
 
 const customerFields = 'id, email, full_name AS "fullName", phone, upi_id AS "upiId", address, operator';
-const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address, final_total AS "finalTotal", paid_at AS "paidAt", payment_link_id AS "paymentLinkId", refunded_at AS "refundedAt"';
+const orderFields = 'id, status, created_at AS "createdAt", lines, subtotal AS "estimatedSubtotal", coupon_code AS "couponCode", discount, address, final_total AS "finalTotal", paid_at AS "paidAt", payment_link_id AS "paymentLinkId", refunded_at AS "refundedAt", payment_method AS "paymentMethod", shipping_fee AS "shippingFee"';
 
 function orderInventory(lines: OrderLine[]) {
   const totals = new Map<string, { id: string; title: string; quantity: number }>();
@@ -254,6 +255,19 @@ api.get('/orders', async (request, response) => {
   response.json({ orders: result.rows });
 });
 
+api.get('/orders/:id/invoice', async (request, response) => {
+  const customer = await requireCustomer(request);
+  const id = uuidField(request.params.id);
+  const { rows: [order] } = await db.query<Order & { paymentId: string | null }>(
+    `SELECT ${orderFields}, payment_id AS "paymentId" FROM orders WHERE id=$1 AND customer_id=$2`, [id, customer.id]);
+  if (!order?.paymentMethod || order.status === 'cancelled' || order.refundedAt || !(order.paidAt || order.paymentMethod === 'cod')) {
+    throw new RequestError(404, 'Invoice or order confirmation is not available.');
+  }
+  const nonce = randomUUID();
+  response.set('Content-Security-Policy', `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'none'`)
+    .type('html').send(orderDocument(order, customer.fullName, nonce));
+});
+
 api.post('/orders', async (request, response) => {
   const customer = await requireCustomer(request);
   const body = record(request.body);
@@ -262,11 +276,16 @@ api.post('/orders', async (request, response) => {
   const coupon = body.coupon == null ? null : record(body.coupon);
   const code = coupon && couponCode(coupon.code);
   const percent = coupon?.percent;
+  const method = body.paymentMethod ?? null;
+  if (method !== null && method !== 'online' && method !== 'upi' && method !== 'cod') throw new RequestError(400, 'Choose a valid payment method.');
+  const config = checkoutConfig();
+  if (method) await expireUnstartedCheckouts(db);
   function delivery(needsShipping: boolean) {
     const address = needsShipping ? addressField(body.address) : null;
     const saveAddress = address !== null && body.saveAddress === true;
     const requestHash = digest(JSON.stringify({
-      items: entries, address, saveAddress, ...(code && { coupon: { code, percent } })
+      items: entries, address, saveAddress, ...(code && { coupon: { code, percent } }),
+      ...(method && { method, total: body.total })
     }));
     return { address, saveAddress, requestHash };
   }
@@ -288,7 +307,7 @@ api.post('/orders', async (request, response) => {
       `SELECT id, title, format, price, stock, published, revision, component_ids AS "componentIds"
          FROM books WHERE id = ANY($1::text[])
            OR id IN (SELECT unnest(component_ids) FROM books WHERE id = ANY($1::text[]))
-        ORDER BY id FOR SHARE`,
+        ORDER BY id FOR UPDATE`,
       [entries.map(([id]) => id)]
     );
     const books = new Map(rows.map(book => [book.id, book]));
@@ -316,7 +335,8 @@ api.post('/orders', async (request, response) => {
       const stock = books.get(line.id)?.stock;
       if (stock != null && line.quantity > stock) throw new RequestError(409, `Not enough copies of ${line.title} for the books and bundles in this bag.`);
     }
-    const { address, saveAddress, requestHash } = delivery(lines.some(line => (line.components ?? [line]).some(item => item.format !== 'eBook')));
+    const contents = lines.flatMap(line => line.components ?? [line]);
+    const { address, saveAddress, requestHash } = delivery(contents.some(item => item.format !== 'eBook'));
     const subtotal = lines.reduce((total, line) => total + line.unitPrice * line.quantity, 0);
     let discount = 0;
     if (code) {
@@ -326,14 +346,32 @@ api.post('/orders', async (request, response) => {
       }
       discount = couponDiscount(subtotal, current.percent);
     }
+    if (method === 'cod' && contents.some(item => item.format === 'eBook')) throw new RequestError(400, 'Cash on Delivery is available only for print books.');
+    const shipping = address ? config.shippingFee : 0;
+    const total = subtotal - discount + shipping;
+    if (method && (body.total !== total || total > 1000000)) throw new RequestError(409, 'The checkout total changed. Reload checkout to review it before ordering.');
+    if (method && method !== 'cod' && total > 0 && !config.enabled) throw new RequestError(503, 'Online payment is not available yet.');
+    const awaiting = method !== null && method !== 'cod' && total > 0;
+    const reserved: { id: string; quantity: number }[] = [];
+    if (method) for (const item of orderInventory(lines)) {
+      if (books.get(item.id)?.stock == null) continue;
+      await tx.query('UPDATE books SET stock=stock-$2, revision=revision+1, updated_at=NOW() WHERE id=$1', [item.id, item.quantity]);
+      reserved.push({ id: item.id, quantity: item.quantity });
+    }
     const inserted = await tx.query<Order>(
-      `INSERT INTO orders (id, customer_id, request_key, request_hash, lines, subtotal, address, coupon_code, discount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO orders (id, customer_id, request_key, request_hash, lines, subtotal, address, coupon_code, discount,
+                           status, payment_method, shipping_fee, final_total, reserved_inventory, payment_expires_at, paid_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+               CASE WHEN $10 = 'awaiting_payment' THEN NOW() + INTERVAL '30 minutes' END,
+               CASE WHEN $13 = 0 THEN NOW() END)
        RETURNING ${orderFields}`,
-      [randomUUID(), customer.id, key, requestHash, JSON.stringify(lines), subtotal, address && JSON.stringify(address), code, discount]
+      [randomUUID(), customer.id, key, requestHash, JSON.stringify(lines), subtotal, address && JSON.stringify(address), code, discount,
+        !method ? 'submitted' : awaiting ? 'awaiting_payment' : 'confirmed', method, method ? shipping : null,
+        method ? total : null, method ? JSON.stringify(reserved) : null]
     );
     if (saveAddress) await tx.query('UPDATE customers SET address = $2 WHERE id = $1', [customer.id, JSON.stringify(address)]);
-    await notifyOrder(tx, customer.id, inserted.rows[0].id, 'Order request received', 'The publisher will review your order request.');
+    if (!awaiting) await notifyOrder(tx, customer.id, inserted.rows[0].id, method ? 'Order confirmed' : 'Order request received',
+      !method ? 'The publisher will review your order request.' : total > 0 ? 'Pay the total when your books are delivered.' : 'No payment is due. Your invoice is available under My orders.');
     return inserted.rows[0];
   });
   response.status(201).json({ order });
@@ -417,7 +455,8 @@ api.get('/publisher', async (request, response) => {
   const orders = await db.query<StoreOrder>(
     `SELECT o.id, o.status, o.created_at AS "createdAt", o.lines, o.subtotal AS "estimatedSubtotal",
             o.address, o.coupon_code AS "couponCode", o.discount, o.final_total AS "finalTotal", o.paid_at AS "paidAt",
-            o.payment_link_id AS "paymentLinkId", o.refunded_at AS "refundedAt", c.email, c.full_name AS "fullName"
+            o.payment_link_id AS "paymentLinkId", o.refunded_at AS "refundedAt", o.payment_method AS "paymentMethod",
+            o.shipping_fee AS "shippingFee", c.email, c.full_name AS "fullName"
        FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.created_at DESC`
   );
   const enquiries = await db.query<Enquiry>(
@@ -446,7 +485,7 @@ api.patch('/publisher/orders/:id', async (request, response) => {
     if (status === 'cancelled' && !order.refundedAt && (order.paidAt || order.paymentLinkId)) {
       throw new RequestError(409, 'Resolve the payment before cancelling this order.');
     }
-    if ((status === 'shipped' || status === 'completed') && order.finalTotal != null && !order.paidAt) {
+    if ((status === 'completed' || status === 'shipped' && order.paymentMethod !== 'cod') && order.finalTotal != null && !order.paidAt) {
       throw new RequestError(409, 'Confirm payment before fulfilling this order.');
     }
     const reserved = order.reserved_inventory ?? [];

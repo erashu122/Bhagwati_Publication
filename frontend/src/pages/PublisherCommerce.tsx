@@ -78,7 +78,9 @@ export function PublisherReviews() {
 export function PublisherPayment({ order, update, disabled }: { order: Order; update: (patch: Partial<Order>) => void; disabled: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  if (order.status !== 'confirmed' || order.paidAt || order.refundedAt) return null;
+  const cod = order.paymentMethod === 'cod';
+  const pending = order.status === 'awaiting_payment';
+  if (!(pending || order.status === 'confirmed' || cod && order.status === 'shipped') || order.paidAt || order.refundedAt) return null;
 
   async function change(path: string, method: string, body: object) {
     setBusy(true);
@@ -88,8 +90,22 @@ export function PublisherPayment({ order, update, disabled }: { order: Order; up
     finally { setBusy(false); }
   }
 
+  async function cancelCheckout() {
+    setBusy(true);
+    setError('');
+    try {
+      await storeRequest('/orders/' + order.id + '/cancel-checkout', 'POST', {});
+      update({ status: 'cancelled' });
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
+
   return <div className="feature-stack">
-    {order.paymentLinkId ? <button className="button secondary" type="button" disabled={disabled || busy}
+    {pending ? <button className="button secondary" type="button" disabled={disabled || busy}
+      onClick={() => { if (window.confirm('Cancel this unpaid checkout and release its stock?')) void cancelCheckout(); }}>Cancel unpaid checkout</button>
+      : cod ? <button className="button secondary" type="button" disabled={disabled || busy || order.finalTotal == null}
+        onClick={() => { if (window.confirm('Confirm that the full COD payment was collected?')) void change('/payment', 'PATCH', { total: order.finalTotal, received: true }); }}>Mark COD payment received</button>
+      : order.paymentLinkId ? <button className="button secondary" type="button" disabled={disabled || busy}
       onClick={() => { if (window.confirm('Close this unpaid payment link?')) void change('/close-payment-link', 'POST', {}); }}>Close unpaid payment link</button>
       : <form className="form-stack" key={order.finalTotal} onSubmit={event => {
         event.preventDefault();

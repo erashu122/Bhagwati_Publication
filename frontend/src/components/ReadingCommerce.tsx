@@ -77,28 +77,37 @@ export function BookReviews({ id }: { id: string }) {
 export function OrderPayment({ order, enabled, refresh }: { order: Order; enabled: boolean; refresh: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  if (order.status !== 'confirmed' || order.finalTotal == null || order.paidAt || order.refundedAt) return null;
-  if (!enabled) return <p className="small-note">Contact the publisher to arrange payment for this order.</p>;
+  const pending = order.status === 'awaiting_payment';
+  if (!(pending || order.status === 'confirmed' && !order.paymentMethod) || order.finalTotal == null || order.paidAt || order.refundedAt) return null;
 
-  async function pay(open: boolean) {
+  async function pay(action: 'open' | 'check' | 'cancel') {
     setError('');
     setBusy(true);
     try {
-      const result = await storeRequest<{ status: string; url?: string }>('/orders/' + order.id + '/payment', 'POST', {});
-      if (open && result.url) {
+      const path = '/orders/' + order.id;
+      if (action === 'cancel') {
+        await storeRequest(path + '/cancel-checkout', 'POST', {});
+        refresh();
+        return;
+      }
+      const result = await storeRequest<{ status: string; url?: string }>(path + '/payment', 'POST', { checkOnly: action === 'check' });
+      if (action === 'open' && result.url) {
         window.location.assign(result.url);
         return;
       }
-      if (result.status === 'expired') setError('The previous link has expired. Select Pay online for a new link.');
-      else if (result.status !== 'paid' && result.status !== 'refunded') setError('Payment is awaiting confirmation.');
+      if (result.status === 'expired') setError(pending ? 'This checkout expired. Add the books to your bag to try again.' : 'The link expired. Select Pay online for a new link.');
+      else if (!['paid', 'refunded', 'cancelled'].includes(result.status)) setError('Payment is awaiting confirmation.');
       refresh();
     } catch (error) { setError(errorMessage(error)); }
     finally { setBusy(false); }
   }
   return <div className="feature-stack">
+    {pending && <p className="small-note">Your order will be confirmed after payment. Unpaid checkouts expire.</p>}
+    {!enabled && <p className="small-note">Online payment is currently unavailable.</p>}
     <div className="inline-actions">
-      <button type="button" className="button primary" disabled={busy} onClick={() => void pay(true)}><CreditCard size={16} aria-hidden="true" /> {busy ? 'Checking…' : 'Pay online'}</button>
-      {order.paymentLinkId && <button type="button" className="button secondary" disabled={busy} onClick={() => void pay(false)}>Check payment</button>}
+      {enabled && <button type="button" className="button primary" disabled={busy} onClick={() => void pay('open')}><CreditCard size={16} aria-hidden="true" /> {busy ? 'Checking…' : order.paymentMethod === 'upi' ? 'Pay by UPI / QR' : 'Pay online'}</button>}
+      {enabled && order.paymentLinkId && <button type="button" className="button secondary" disabled={busy} onClick={() => void pay('check')}>Check payment</button>}
+      {pending && <button type="button" className="button secondary" disabled={busy} onClick={() => { if (window.confirm('Cancel this unpaid checkout?')) void pay('cancel'); }}>Cancel checkout</button>}
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
   </div>;

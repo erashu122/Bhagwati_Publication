@@ -28,6 +28,7 @@ export type OrderLine = {
 
 export const orderStatusLabels = {
   submitted: 'Awaiting confirmation',
+  awaiting_payment: 'Awaiting payment',
   confirmed: 'Confirmed',
   shipped: 'Shipped',
   completed: 'Completed',
@@ -35,6 +36,8 @@ export const orderStatusLabels = {
 } as const;
 
 export type OrderStatus = keyof typeof orderStatusLabels;
+export type PaymentMethod = 'online' | 'upi' | 'cod';
+export type CheckoutConfig = { enabled: boolean; shippingFee: number };
 
 export type Order = {
   id: string;
@@ -49,6 +52,8 @@ export type Order = {
   paidAt: string | null;
   paymentLinkId: string | null;
   refundedAt: string | null;
+  paymentMethod: PaymentMethod | null;
+  shippingFee: number | null;
 };
 
 export type Ebook = { id: string; title: string; available: boolean };
@@ -95,11 +100,11 @@ export type PublisherOverview = {
   stockAlerts: { id: string; title: string; stock: number }[];
 };
 
-export function nextOrderStatuses(order: Pick<Order, 'status' | 'address'>): OrderStatus[] {
+export function nextOrderStatuses(order: Pick<Order, 'status' | 'address' | 'paymentMethod'>): OrderStatus[] {
   switch (order.status) {
     case 'submitted': return ['confirmed', 'cancelled'];
     case 'confirmed': return [order.address ? 'shipped' : 'completed', 'cancelled'];
-    case 'shipped': return ['completed'];
+    case 'shipped': return order.paymentMethod === 'cod' ? ['completed', 'cancelled'] : ['completed'];
     default: return [];
   }
 }

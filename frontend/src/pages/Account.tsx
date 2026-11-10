@@ -293,6 +293,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
   const tab = params.has('order') ? 'orders' : accountTabs.find(tab => tab.id === params.get('tab'))?.id ?? 'overview';
   const justPlaced = orders?.find(order => order.id === params.get('order'));
   const viewedOrder = params.get('view');
+  const returnedFromPayment = params.get('return') === 'payment' && !!viewedOrder;
   const displayedOrders = tab === 'overview' ? orders?.slice(0, 1)
     : viewedOrder ? orders?.filter(order => order.id === viewedOrder) : orders;
   const fromCheckout = params.get('next') === 'checkout';
@@ -316,6 +317,14 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
     });
     return () => { current = false; };
   }, [customer.id, tab, reload, setCustomer]);
+
+  useEffect(() => {
+    if (!returnedFromPayment || !viewedOrder) return;
+    let active = true;
+    storeRequest('/orders/' + encodeURIComponent(viewedOrder) + '/payment', 'POST', { checkOnly: true })
+      .then(() => { if (active) setReload(value => value + 1); }).catch(() => {});
+    return () => { active = false; };
+  }, [customer.id, returnedFromPayment, viewedOrder]);
 
   async function logout() {
     setLogoutBusy(true);
@@ -345,10 +354,10 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
         <div><h2>Your bag is ready</h2><p>Your books stayed in your bag while you opened your account.</p></div>
         <Link className="button primary" to="/checkout">Continue to checkout <ArrowRight size={17} aria-hidden="true" /></Link>
       </div>}
-      {justPlaced && <p className="order-success" role="status"><CheckCircle2 size={23} aria-hidden="true" /><span><strong>Order request {orderReference(justPlaced.id)} received.</strong> The publisher will review availability and final charges before fulfillment.</span></p>}
+      {justPlaced && justPlaced.status !== 'cancelled' && <p className="order-success" role="status"><CheckCircle2 size={23} aria-hidden="true" /><span><strong>{orderReference(justPlaced.id)}</strong> · {justPlaced.status === 'awaiting_payment' ? 'Continue to payment below to confirm your order.' : justPlaced.paidAt ? 'Order confirmed. Your invoice is ready below.' : justPlaced.paymentMethod === 'cod' ? 'COD order confirmed. Pay on delivery.' : 'Order request received.'}</span></p>}
       <div className="dashboard-metrics">
         <Link to="/cart"><span className="dashboard-icon"><ShoppingBag size={21} aria-hidden="true" /></span><span><small>Book bag</small><strong>{cartCount} {cartCount === 1 ? 'copy' : 'copies'}</strong></span><ArrowRight className="dashboard-arrow" size={17} aria-hidden="true" /></Link>
-        <Link to={accountPage('orders')}><span className="dashboard-icon"><Package size={21} aria-hidden="true" /></span><span><small>Order requests</small><strong>{orders?.length ?? '—'}</strong></span><ArrowRight className="dashboard-arrow" size={17} aria-hidden="true" /></Link>
+        <Link to={accountPage('orders')}><span className="dashboard-icon"><Package size={21} aria-hidden="true" /></span><span><small>My orders</small><strong>{orders?.length ?? '—'}</strong></span><ArrowRight className="dashboard-arrow" size={17} aria-hidden="true" /></Link>
         <Link to={accountPage('profile')}><span className="dashboard-icon"><MapPin size={21} aria-hidden="true" /></span><span><small>Delivery address</small><strong>{customer.address ? 'Saved' : 'Add an address'}</strong></span><ArrowRight className="dashboard-arrow" size={17} aria-hidden="true" /></Link>
       </div>
       <nav className="dashboard-nav" aria-label="Account navigation">
@@ -376,6 +385,9 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
           : !displayedOrders?.length ? <div className="empty-panel"><Package size={32} aria-hidden="true" /><h2>{viewedOrder ? 'Order unavailable' : 'No orders yet'}</h2><p>Your order requests will appear here.</p></div>
           : <div className="account-orders">{displayedOrders.map(order => <OrderCard key={order.id} order={order}>
             <OrderPayment order={order} enabled={paymentsEnabled} refresh={() => setReload(value => value + 1)} />
+            {order.paymentMethod && order.status !== 'cancelled' && !order.refundedAt && (order.paidAt || order.paymentMethod === 'cod') && <div className="inline-actions">
+              <a className="button secondary" href={'/api/orders/' + order.id + '/invoice'} target="_blank" rel="noopener">{order.paidAt ? 'View invoice / receipt' : 'View COD confirmation'}</a>
+            </div>}
           </OrderCard>)}</div>}
       </>}
     </section>
