@@ -48,7 +48,7 @@ export function Home({ add }: { add: (id: string) => void }) {
         {first && <div className="hero-display">
           <HeroDecoration />
           <div className="hero-shelf-label"><span>THE BOOKSHELF</span><span>01 / THE COLLECTION</span></div>
-          <img className="hero-imprint" src="/bp-mark.svg" width="48" height="48" alt="BP" />
+          <img className="hero-imprint" src="/bhagwati-publications-logo.jpg" width="1600" height="533" alt="" />
           {second && <Link to={'/books/' + second.id} aria-label={'View ' + second.title} className="hero-book hero-book-back"><BookCover book={second} /></Link>}
           <Link to={'/books/' + first.id} aria-label={'View ' + first.title} className="hero-book hero-book-front"><BookCover book={first} /></Link>
           <div className="hero-caption"><span /> PRINT &amp; DIGITAL EDITIONS <span /></div>

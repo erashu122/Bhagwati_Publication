@@ -49,11 +49,6 @@ main:focus { outline: none; }
 .header-inner { min-height: 94px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; width: fit-content; color: var(--navy); }
 .brand-logo { display: block; width: clamp(154px, 23vw, 245px); height: auto; flex: none; mix-blend-mode: multiply; }
-.brand-mark { display: block; width: 48px; height: 48px; flex: none; }
-.brand-wordmark { display: grid; gap: 5px; padding-left: 12px; border-left: 1px solid var(--line); }
-.brand-name { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; line-height: 1; letter-spacing: -.025em; }
-.brand-location { color: var(--accent); font-size: .56rem; font-weight: 800; letter-spacing: .16em; }
-.brand-imprint .brand-wordmark { padding: 0; border: 0; }
 .main-nav, .header-actions { display: flex; align-items: center; }
 .main-nav { gap: clamp(20px, 3vw, 42px); }
 .main-nav a { position: relative; padding: 11px 0; color: var(--muted); white-space: nowrap; font-size: .87rem; font-weight: 650; }
@@ -92,7 +87,7 @@ main:focus { outline: none; }
 .hero-engraving { position: absolute; width: 100%; height: 100%; inset: 0; opacity: .65; pointer-events: none; }
 .hero-shelf-label { position: absolute; top: 22px; left: 24px; display: grid; gap: 4px; color: #fff3db; font-size: .63rem; font-weight: 800; letter-spacing: .15em; }
 .hero-shelf-label span + span { color: var(--gold); font-size: .51rem; letter-spacing: .12em; }
-.hero-imprint { position: absolute; top: 21px; right: 21px; width: clamp(32px, 4vw, 48px); height: auto; }
+.hero-imprint { position: absolute; top: 21px; right: 21px; width: clamp(74px, 27%, 148px); height: auto; border-radius: 4px; }
 .hero-book { position: absolute; display: block; width: 30%; transition: transform .2s ease; }
 .hero-book .book-cover { width: 100%; height: auto; box-shadow: 12px 20px 26px #0309149c, 3px 5px 6px #03091477; }
 .hero-book-back { top: 23%; left: 55%; transform: rotate(7deg); }
@@ -335,7 +330,6 @@ main:focus { outline: none; }
 @media (max-width: 450px) {
   .header-inner { min-height: 68px; }
   .header .brand-logo { width: clamp(116px, 40vw, 156px); }
-  .header .brand-wordmark { display: none; }
   .header-actions { gap: 0; }
   .header-actions .icon-button { min-width: 36px; }
   .hero-break { display: none; }

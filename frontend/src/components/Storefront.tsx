@@ -5,15 +5,9 @@ import type { Book } from '../data/books';
 import { BookCover } from './BookCover';
 import { WishlistButton } from '../customer-extras';
 
-export function Brand({ imprint = false }: { imprint?: boolean }) {
-  return <Link className={imprint ? 'brand brand-imprint' : 'brand'} to="/" aria-label="Bhagwati Publications home">
-    {imprint ? <>
-      <img className="brand-mark" src="/bp-mark.svg" width="48" height="48" alt="" />
-      <span className="brand-wordmark">
-        <span className="brand-name">Bhagwati<br />Publications</span>
-        <span className="brand-location">NEW DELHI</span>
-      </span>
-    </> : <img className="brand-logo" src="/bhagwati-publications-logo.jpg" width="1600" height="533" alt="" />}
+export function Brand() {
+  return <Link className="brand" to="/" aria-label="Bhagwati Publications home">
+    <img className="brand-logo" src="/bhagwati-publications-logo.jpg" width="1600" height="533" alt="" />
   </Link>;
 }
 
