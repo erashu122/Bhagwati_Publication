@@ -26,15 +26,25 @@ function CoverArt({ artwork }: { artwork: Book['artwork'] }) {
   return <span className="cover-icon"><Icon strokeWidth={0.8} /></span>;
 }
 
+const suppliedCovers = new Map([
+  ['artificial-intelligence', '/covers/artificial-intelligence.png'],
+  ['bhai-ho-to-aisa', '/covers/bhai-ho-to-aisa.jpg'],
+  ['construction-arbitration', '/covers/construction-arbitration.jpg'],
+  ['inventory-management', '/covers/inventory-management.jpg'],
+  ['market-leadership', '/covers/market-leadership.jpg'],
+  ['practical-e-auctions', '/covers/practical-e-auctions.jpg']
+]);
+
 export function BookCover({ book }: { book: Book }) {
-  if (book.coverImage) {
-    return <img className="book-cover cover-photo" src={book.coverImage} alt={`${book.title} book cover`} />;
+  const cover = book.coverImage || suppliedCovers.get(book.id);
+  if (cover) {
+    return <img className={`book-cover cover-photo${book.coverImage ? '' : ' cover-supplied'}`} src={cover} alt={`${book.title} book cover`} decoding="async" />;
   }
 
   return (
     <div className={`book-cover cover-${book.palette}`} role="img" aria-label={`Illustrative cover for ${book.title}`}>
       <div className="cover-rule" aria-hidden="true">
-        <span className="cover-imprint">BHAGWATI PUBLICATION</span>
+        <span className="cover-imprint">BHAGWATI PUBLICATIONS</span>
         <span className="cover-title" lang={book.language === 'Hindi' ? 'hi' : 'en'}>{book.coverTitle}</span>
         {book.coverSubtitle && <span className="cover-subtitle">{book.coverSubtitle}</span>}
         <span className="cover-art"><CoverArt artwork={book.artwork} /></span>

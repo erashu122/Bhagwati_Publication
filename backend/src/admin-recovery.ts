@@ -19,7 +19,7 @@ export async function issueAdminRecovery(db: DatabaseExecutor, replaceActive = f
 export async function emailAdminRecovery(db: DatabaseExecutor, requestedEmail: string) {
   const recipient = process.env.ADMIN_RECOVERY_EMAIL?.trim().toLowerCase();
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const sender = process.env.ADMIN_RECOVERY_FROM?.trim() || 'Bhagwati Publication <onboarding@resend.dev>';
+  const sender = process.env.ADMIN_RECOVERY_FROM?.trim() || 'Bhagwati Publications <onboarding@resend.dev>';
   if (!recipient || !apiKey) {
     throw new RequestError(503, 'Email recovery is not configured yet. Contact the store owner for a recovery code.');
   }
@@ -40,9 +40,9 @@ export async function emailAdminRecovery(db: DatabaseExecutor, requestedEmail: s
       body: JSON.stringify({
         from: sender,
         to: [recipient],
-        subject: 'Bhagwati Publication admin recovery code',
+        subject: 'Bhagwati Publications admin recovery code',
         text: 'Your one-time admin recovery code is:\n\n' + recovery.code +
-          '\n\nPaste it into Forgot password on the Bhagwati Publication store. It expires in 30 minutes. If you did not request this code, you can ignore this email.'
+          '\n\nPaste it into Forgot password on the Bhagwati Publications store. It expires in 30 minutes. If you did not request this code, you can ignore this email.'
       }),
       signal: AbortSignal.timeout(8000)
     });

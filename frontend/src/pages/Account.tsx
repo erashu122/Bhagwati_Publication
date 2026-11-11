@@ -71,7 +71,7 @@ export function SignIn({ register }: { register: boolean }) {
 
   return <section className="container section auth-layout">
     <div className="auth-art">
-      <p className="eyebrow"><BookOpen size={16} aria-hidden="true" /> BHAGWATI PUBLICATION</p>
+      <p className="eyebrow"><BookOpen size={16} aria-hidden="true" /> BHAGWATI PUBLICATIONS</p>
       <h2>A place for your reading journey.</h2>
       <p>Keep your delivery details and orders together as you explore the collection.</p>
       {books[0] && <div className="auth-cover" aria-hidden="true"><BookCover book={books[3] ?? books[0]} /></div>}
@@ -94,7 +94,7 @@ export function SignIn({ register }: { register: boolean }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button primary" disabled={busy} type="submit">{busy ? 'Please wait…' : register ? 'Create account' : 'Sign in'} <ArrowRight size={17} aria-hidden="true" /></button>
       </form>
-      <p className="auth-switch">{register ? 'Already have an account?' : 'New to Bhagwati Publication?'}{' '}
+      <p className="auth-switch">{register ? 'Already have an account?' : 'New to Bhagwati Publications?'}{' '}
         <Link className="text-link" to={(register ? '/login' : '/register') + authSwitchQuery}>{register ? 'Sign in' : 'Create an account'}</Link>
       </p>
     </div>

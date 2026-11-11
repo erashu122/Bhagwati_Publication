@@ -185,7 +185,7 @@ export function Publisher() {
   return <div className="admin-page">
     <div className="admin-banner">
       <div className="container admin-banner-inner">
-        <div><p className="eyebrow"><ShieldCheck size={16} aria-hidden="true" /> BHAGWATI PUBLICATION</p>
+        <div><p className="eyebrow"><ShieldCheck size={16} aria-hidden="true" /> BHAGWATI PUBLICATIONS</p>
           <h1>Admin dashboard</h1><p>Manage books, author details and customer orders.</p></div>
         <Link className="button admin-store-link" to="/">View storefront <ArrowUpRight size={17} aria-hidden="true" /></Link>
       </div>

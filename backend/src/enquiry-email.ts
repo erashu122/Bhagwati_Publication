@@ -23,7 +23,7 @@ export async function sendEnquiryEmail(db: DatabaseExecutor, id: string) {
   let status: EnquiryEmailStatus = 'failed';
   if (apiKey && recipient) {
     const sender = process.env.CONTACT_EMAIL_FROM?.trim() || process.env.ADMIN_RECOVERY_FROM?.trim()
-      || 'Bhagwati Publication <onboarding@resend.dev>';
+      || 'Bhagwati Publications <onboarding@resend.dev>';
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -35,7 +35,7 @@ export async function sendEnquiryEmail(db: DatabaseExecutor, id: string) {
           from: sender,
           to: [recipient],
           reply_to: enquiry.email,
-          subject: enquiry.bulkDetails ? 'Bulk order enquiry · Bhagwati Publication' : 'New contact enquiry · Bhagwati Publication',
+          subject: enquiry.bulkDetails ? 'Bulk order enquiry · Bhagwati Publications' : 'New contact enquiry · Bhagwati Publications',
           text: `Name: ${enquiry.fullName}\nEmail: ${enquiry.email}\n` +
             (enquiry.bulkDetails ? `Quantity: ${enquiry.bulkDetails.quantity}\nDelivery city: ${enquiry.bulkDetails.city}\nNeeded by: ${enquiry.bulkDetails.neededBy ?? 'Flexible'}\n` : '') +
             '\n' + enquiry.message

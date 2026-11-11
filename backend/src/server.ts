@@ -563,7 +563,7 @@ if (!onVercel) {
 
   const port = Number(process.env.PORT || (development ? 5173 : 4000));
   const host = process.env.HOST || '127.0.0.1';
-  server.listen(port, host, () => console.log(`Bhagwati Publication · http://${host}:${port}/`));
+  server.listen(port, host, () => console.log(`Bhagwati Publications · http://${host}:${port}/`));
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.once(signal, () => server.close(async () => {

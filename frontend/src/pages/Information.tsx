@@ -10,7 +10,7 @@ export function About() {
   const { content } = useCatalog();
   return <div className="container section page-content">
     <p className="eyebrow"><span className="diamond" /> OUR STORY</p>
-    <h1>Bhagwati Publication</h1>
+    <h1>Bhagwati Publications</h1>
     <p className="about-hindi" lang="hi">भगवती प्रकाशन</p>
     <div className="information-grid">
       <div className="prose">
@@ -18,7 +18,7 @@ export function About() {
         {content.aboutBody.split(/\n\s*\n/u).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
         <BrowseLink />
       </div>
-      <div className="information-art" aria-hidden="true"><BookOpen size={110} strokeWidth={0.75} /><span>BHAGWATI PUBLICATION</span></div>
+      <div className="information-art" aria-hidden="true"><BookOpen size={110} strokeWidth={0.75} /><span>BHAGWATI PUBLICATIONS</span></div>
     </div>
   </div>;
 }
@@ -97,7 +97,7 @@ export function Policy() {
 
 export function NotFound() {
   return <section className="container section"><div className="empty-panel">
-    <BookOpen size={33} strokeWidth={1.3} aria-hidden="true" /><p className="eyebrow">404 · BHAGWATI PUBLICATION</p>
+    <BookOpen size={33} strokeWidth={1.3} aria-hidden="true" /><p className="eyebrow">404 · BHAGWATI PUBLICATIONS</p>
     <h1>Page not found</h1><p>Return to the homepage to explore the collection.</p>
     <Link className="button primary" to="/">Back to home <ArrowRight size={17} aria-hidden="true" /></Link>
   </div></section>;

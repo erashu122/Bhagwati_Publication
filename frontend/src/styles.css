@@ -48,7 +48,7 @@ main:focus { outline: none; }
 .header { position: relative; z-index: 2; background: var(--paper); border-bottom: 1px solid var(--line); }
 .header-inner { min-height: 94px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; width: fit-content; color: var(--navy); }
-.brand-logo { display: block; width: 114px; height: auto; flex: none; mix-blend-mode: multiply; }
+.brand-logo { display: block; width: clamp(154px, 23vw, 245px); height: auto; flex: none; mix-blend-mode: multiply; }
 .brand-mark { display: block; width: 48px; height: 48px; flex: none; }
 .brand-wordmark { display: grid; gap: 5px; padding-left: 12px; border-left: 1px solid var(--line); }
 .brand-name { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; line-height: 1; letter-spacing: -.025em; }
@@ -173,6 +173,7 @@ main:focus { outline: none; }
 .cover-icon { display: block; width: 54%; }
 .cover-author { font-size: 4.65cqw; letter-spacing: .075em; margin-bottom: 5%; }
 .cover-photo { object-fit: cover; }
+.cover-supplied { object-fit: contain; background: transparent; }
 
 .category-section { background: #f0ede3; }
 .category-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 17px; }
@@ -332,7 +333,7 @@ main:focus { outline: none; }
 
 @media (max-width: 450px) {
   .header-inner { min-height: 68px; }
-  .header .brand-logo { width: 96px; }
+  .header .brand-logo { width: clamp(116px, 40vw, 156px); }
   .header .brand-wordmark { display: none; }
   .header-actions { gap: 0; }
   .header-actions .icon-button { min-width: 36px; }

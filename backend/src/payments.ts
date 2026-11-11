@@ -230,7 +230,7 @@ export function paymentsRouter(db: StoreDatabase, requireCustomer: (request: Req
         link = found.payment_links?.find(item => item.reference_id === reference);
         link ??= await gateway<Link>('/payment_links', {
           amount, currency: 'INR', reference_id: reference, accept_partial: false,
-          description: 'Bhagwati Publication order ' + id.slice(0, 8),
+          description: 'Bhagwati Publications order ' + id.slice(0, 8),
           notify: { sms: false, email: false }, reminder_enable: false,
           callback_url: siteOrigin + '/account?tab=orders&view=' + id + '&return=payment',
           callback_method: 'get',

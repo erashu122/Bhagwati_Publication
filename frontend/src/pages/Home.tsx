@@ -26,8 +26,7 @@ function HeroDecoration() {
 export function Home({ add }: { add: (id: string) => void }) {
   const { books, categories, content, authorPhoto } = useCatalog();
   const navigate = useNavigate();
-  const featured = books.filter(book => book.featured).slice(0, 4);
-  const shelf = featured.length ? featured : books.slice(0, 4);
+  const showSaraswatPreview = !books.some(book => book.title.includes('सारस्वत ब्राह्मण'));
   const [first, second] = books;
   return <>
     <section className="hero">
@@ -44,7 +43,7 @@ export function Home({ add }: { add: (id: string) => void }) {
             <input aria-label="Book title, author or category" name="q" type="search" maxLength={160} placeholder="Title, author, topic" />
             <button className="button primary" type="submit"><Search size={17} aria-hidden="true" /> Search</button>
           </form>
-          <Link className="hero-browse" to="/books">Browse all books <ArrowRight size={16} aria-hidden="true" /></Link>
+          <a className="hero-browse" href="#home-books">Browse all books <ArrowRight size={16} aria-hidden="true" /></a>
         </div>
         {first && <div className="hero-display">
           <HeroDecoration />
@@ -58,18 +57,29 @@ export function Home({ add }: { add: (id: string) => void }) {
     </section>
     <nav className="benefits" aria-label="Collection shortcuts">
       <div className="container benefits-grid">
-        <Link to="/books"><BookOpen aria-hidden="true" /><span><strong>Explore the collection</strong><small>Print and digital editions</small></span></Link>
+        <a href="#home-books"><BookOpen aria-hidden="true" /><span><strong>Explore the collection</strong><small>Print and digital editions</small></span></a>
         <Link to="/books?q=Hindi"><Languages aria-hidden="true" /><span><strong>Hindi books</strong><small>Read in Hindi</small></span></Link>
         <Link to="/author"><UserRound aria-hidden="true" /><span><strong>Meet the author</strong><small>Discover their books</small></span></Link>
       </div>
     </nav>
-    {shelf.length > 0 && <section className="container section featured">
+    <section className="container section featured" id="home-books">
       <div className="section-heading">
-        <div><p className="eyebrow"><span className="diamond" /> THE BOOKSHELF</p><h2>{featured.length ? 'Featured collection' : 'From the collection'}</h2><p>Start with titles from across our collection.</p></div>
-        <Link className="text-link" to="/books">View all books <ArrowRight size={17} aria-hidden="true" /></Link>
+        <div><p className="eyebrow"><span className="diamond" /> PRINT AND DIGITAL EDITIONS</p><h2>All books</h2></div>
+        <Link className="text-link" to="/books">Search and filter books <ArrowRight size={17} aria-hidden="true" /></Link>
       </div>
-      <div className="book-grid">{shelf.map(book => <BookCard key={book.id} book={book} add={add} />)}</div>
-    </section>}
+      <div className="book-grid">
+        {books.map(book => <BookCard key={book.id} book={book} add={add} />)}
+        {showSaraswatPreview && <article className="book-card">
+          <div className="card-cover stage-sand"><img className="book-cover cover-photo cover-supplied" src="/covers/saraswat-brahman.jpg" alt="" loading="lazy" /></div>
+          <div className="book-info">
+            <p className="eyebrow">Hindi Literature</p>
+            <h3 lang="hi">सारस्वत ब्राह्मणः — सरस्वती से सभ्यता तक</h3>
+            <p className="card-author" lang="hi">डॉ. एस. बी. सारस्वत</p>
+            <p>Listing details pending</p>
+          </div>
+        </article>}
+      </div>
+    </section>
     {categories.length > 0 && <section className="category-section section">
       <div className="container">
         <div className="section-heading"><div><p className="eyebrow"><span className="diamond" /> BY INTEREST</p><h2>Browse by category</h2></div></div>

@@ -254,7 +254,7 @@ export function catalogRouter(db: StoreDatabase, requireOperator: (request: Requ
       } else {
         await tx.query(`
           INSERT INTO books (id, title, cover_title, description, category_id, price, published, component_ids, format, language, author, artwork, palette)
-          VALUES ($1,$2,$2,$3,$4,$5,$6,$7,'Bundle','Multiple','Bhagwati Publication','boxes','slate')
+          VALUES ($1,$2,$2,$3,$4,$5,$6,$7,'Bundle','Multiple','Bhagwati Publications','boxes','slate')
         `, [id, title, description, category, price, body.published, ids]);
         if (body.published) await notifyBook(tx, id, title);
       }

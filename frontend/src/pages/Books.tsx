@@ -44,7 +44,7 @@ export function Catalog({ add }: AddBook) {
   return <>
     <section className="page-banner"><div className="container">
       <p className="eyebrow"><span className="diamond" /> THE BOOKSHELF</p>
-      <h1>All books</h1><p>Explore the Bhagwati Publication catalog.</p>
+      <h1>All books</h1><p>Explore the Bhagwati Publications catalog.</p>
     </div></section>
     <section className="container section catalog" aria-label="Book catalog">
       <div className="catalog-controls">

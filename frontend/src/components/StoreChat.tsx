@@ -100,7 +100,7 @@ export function StoreChat() {
   return <aside className="store-chat" aria-label="Store help" onKeyDown={event => { if (open && event.key === 'Escape') close(); }}>
     {open && <section id="store-chat-panel" className="chat-panel" aria-labelledby="store-chat-title">
       <div className="chat-heading">
-        <div><p className="eyebrow">BHAGWATI PUBLICATION</p><h2 id="store-chat-title">Bookshop assistant</h2></div>
+        <div><p className="eyebrow">BHAGWATI PUBLICATIONS</p><h2 id="store-chat-title">Bookshop assistant</h2></div>
         <button className="icon-button" type="button" onClick={close} aria-label="Close chat"><X size={19} aria-hidden="true" /></button>
       </div>
       <div className="chat-log" ref={log} role="log" aria-label="Conversation">

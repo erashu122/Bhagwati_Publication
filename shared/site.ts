@@ -1,6 +1,6 @@
 export const siteOrigin = 'https://bhagwatipublication.vercel.app';
-export const homeTitle = 'Bhagwati Publication | Books for curious minds';
-export const homeDescription = 'Explore the Bhagwati Publication collection of books on business, leadership, technology and Hindi literature.';
+export const homeTitle = 'Bhagwati Publications | Books for curious minds';
+export const homeDescription = 'Explore the Bhagwati Publications collection of books on business, leadership, technology and Hindi literature.';
 
 export const publicPages: Record<string, string> = {
   '/': 'Home',
