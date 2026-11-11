@@ -93,12 +93,13 @@ main:focus { outline: none; }
 .hero-shelf-label { position: absolute; top: 22px; left: 24px; display: grid; gap: 4px; color: #fff3db; font-size: .63rem; font-weight: 800; letter-spacing: .15em; }
 .hero-shelf-label span + span { color: var(--gold); font-size: .51rem; letter-spacing: .12em; }
 .hero-imprint { position: absolute; top: 21px; right: 21px; width: clamp(32px, 4vw, 48px); height: auto; }
-.hero-book { position: absolute; display: block; width: 35%; transition: transform .2s ease; }
-.hero-book .book-cover { box-shadow: 12px 20px 26px #0309149c, 3px 5px 6px #03091477; }
-.hero-book-back { top: 21%; left: 49%; transform: rotate(11deg); }
-.hero-book-front { top: 26%; left: 19%; transform: rotate(-8deg); }
-.hero-book-back:hover, .hero-book-back:focus-visible { transform: translateY(-5px) rotate(11deg); }
-.hero-book-front:hover, .hero-book-front:focus-visible { transform: translateY(-5px) rotate(-8deg); }
+.hero-book { position: absolute; display: block; width: 30%; transition: transform .2s ease; }
+.hero-book .book-cover { width: 100%; height: auto; box-shadow: 12px 20px 26px #0309149c, 3px 5px 6px #03091477; }
+.hero-book-back { top: 23%; left: 55%; transform: rotate(7deg); }
+.hero-book-front { top: 25%; left: 15%; transform: rotate(-7deg); }
+.hero-book-front:only-of-type { left: 35%; }
+.hero-book-back:hover, .hero-book-back:focus-visible { transform: translateY(-5px) rotate(7deg); }
+.hero-book-front:hover, .hero-book-front:focus-visible { transform: translateY(-5px) rotate(-7deg); }
 .hero-book-front .book-cover { --cover-bg: #142647; --cover-color: #ead197; }
 .hero-caption { position: absolute; bottom: 5%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 9px; color: #e4ce9e; font-size: .57rem; letter-spacing: .19em; }
 .hero-caption span { width: 18px; height: 1px; background: currentColor; opacity: .7; }
