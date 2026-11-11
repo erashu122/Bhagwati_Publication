@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowRight, BookOpen, BriefcaseBusiness, Cpu, Feather, Languages, Lightbulb, Search, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BookCover } from '../components/BookCover';
+import { PublisherLogo } from '../components/PublisherLogo';
 import { BookCard, BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
 import { AuthorPortrait } from '../components/AuthorPortrait';
@@ -48,7 +49,7 @@ export function Home({ add }: { add: (id: string) => void }) {
         {first && <div className="hero-display">
           <HeroDecoration />
           <div className="hero-shelf-label"><span>THE BOOKSHELF</span><span>01 / THE COLLECTION</span></div>
-          <img className="hero-imprint" src="/bhagwati-publications-logo.jpg" width="1600" height="533" alt="" />
+          <PublisherLogo className="hero-imprint" alt="" />
           {second && <Link to={'/books/' + second.id} aria-label={'View ' + second.title} className="hero-book hero-book-back"><BookCover book={second} /></Link>}
           <Link to={'/books/' + first.id} aria-label={'View ' + first.title} className="hero-book hero-book-front"><BookCover book={first} /></Link>
           <div className="hero-caption"><span /> PRINT &amp; DIGITAL EDITIONS <span /></div>

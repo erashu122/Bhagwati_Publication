@@ -264,7 +264,7 @@ api.get('/orders/:id/invoice', async (request, response) => {
     throw new RequestError(404, 'Invoice or order confirmation is not available.');
   }
   const nonce = randomUUID();
-  response.set('Content-Security-Policy', `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'none'`)
+  response.set('Content-Security-Policy', `default-src 'none'; img-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'none'`)
     .type('html').send(orderDocument(order, customer.fullName, nonce));
 });
 

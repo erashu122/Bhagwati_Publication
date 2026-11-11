@@ -7,6 +7,7 @@ import { maximumPasswordLength, minimumPasswordLength, passwordHint, passwordPat
 import { AccountLoading, errorMessage, StoreError, storeRequest, useAccount } from '../account';
 import { AddressFields, indianMobilePattern, readAddress } from '../components/AddressFields';
 import { BookCover } from '../components/BookCover';
+import { PublisherLogo } from '../components/PublisherLogo';
 import { OrderCard, orderReference } from '../components/OrderCard';
 import { BrowseLink } from '../components/Storefront';
 import { useCatalog } from '../catalog';
@@ -71,7 +72,7 @@ export function SignIn({ register }: { register: boolean }) {
 
   return <section className="container section auth-layout">
     <div className="auth-art">
-      <p className="eyebrow"><BookOpen size={16} aria-hidden="true" /> BHAGWATI PUBLICATIONS</p>
+      <PublisherLogo />
       <h2>A place for your reading journey.</h2>
       <p>Keep your delivery details and orders together as you explore the collection.</p>
       {books[0] && <div className="auth-cover" aria-hidden="true"><BookCover book={books[3] ?? books[0]} /></div>}
@@ -142,6 +143,7 @@ export function ResetAdminPassword() {
 
   return <section className="container section">
     <div className="auth-form recovery-form">
+      <PublisherLogo />
       <p className="eyebrow"><ShieldCheck size={16} aria-hidden="true" /> PUBLISHER ACCESS</p>
       <h1>{complete ? 'Password updated' : 'Reset admin password'}</h1>
       {complete ? <p className="feedback" role="status"><CheckCircle2 size={18} aria-hidden="true" /> Sign in with the ID <strong>admin</strong> and your new password.</p>
@@ -342,7 +344,7 @@ export function Dashboard({ customer, cartCount }: { customer: Customer; cartCou
   return <>
     <section className="dashboard-banner">
       <div className="container dashboard-head">
-        <div><p className="eyebrow"><span className="diamond" /> CUSTOMER DASHBOARD</p>
+        <div><PublisherLogo /><p className="eyebrow"><span className="diamond" /> CUSTOMER DASHBOARD</p>
           <h1>Welcome, {customer.fullName.split(/\s+/u)[0]}.</h1><p>Manage your profile and follow your orders.</p>
         </div>
         <button type="button" className="button dashboard-logout" disabled={logoutBusy} onClick={() => void logout()}><LogOut size={17} aria-hidden="true" /> Sign out</button>

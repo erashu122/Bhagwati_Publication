@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { canOrder, formatPrice } from '../data/books';
 import type { Book } from '../data/books';
 import { BookCover } from './BookCover';
+import { PublisherLogo } from './PublisherLogo';
 import { WishlistButton } from '../customer-extras';
 
 export function Brand() {
   return <Link className="brand" to="/" aria-label="Bhagwati Publications home">
-    <img className="brand-logo" src="/bhagwati-publications-logo.jpg" width="1600" height="533" alt="" />
+    <PublisherLogo className="brand-logo" alt="" />
   </Link>;
 }
 

@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, CheckCircle2, MessageSquare } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { errorMessage, storeRequest, useAccount } from '../account';
 import { BrowseLink } from '../components/Storefront';
+import { PublisherLogo } from '../components/PublisherLogo';
 import { useCatalog } from '../catalog';
 
 export function About() {
@@ -18,7 +19,7 @@ export function About() {
         {content.aboutBody.split(/\n\s*\n/u).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
         <BrowseLink />
       </div>
-      <div className="information-art" aria-hidden="true"><BookOpen size={110} strokeWidth={0.75} /><span>BHAGWATI PUBLICATIONS</span></div>
+      <div className="information-art" aria-hidden="true"><PublisherLogo alt="" /></div>
     </div>
   </div>;
 }

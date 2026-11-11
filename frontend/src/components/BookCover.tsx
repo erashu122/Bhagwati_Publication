@@ -1,5 +1,6 @@
 import { Boxes, Building2, Gavel, Landmark, Scale } from 'lucide-react';
 import type { Book } from '../data/books';
+import { PublisherLogo } from './PublisherLogo';
 
 function CoverArt({ artwork }: { artwork: Book['artwork'] }) {
   if (artwork === 'orbit') {
@@ -44,7 +45,7 @@ export function BookCover({ book }: { book: Book }) {
   return (
     <div className={`book-cover cover-${book.palette}`} role="img" aria-label={`Illustrative cover for ${book.title}`}>
       <div className="cover-rule" aria-hidden="true">
-        <span className="cover-imprint">BHAGWATI PUBLICATIONS</span>
+        <PublisherLogo className="cover-imprint" alt="" />
         <span className="cover-title" lang={book.language === 'Hindi' ? 'hi' : 'en'}>{book.coverTitle}</span>
         {book.coverSubtitle && <span className="cover-subtitle">{book.coverSubtitle}</span>}
         <span className="cover-art"><CoverArt artwork={book.artwork} /></span>

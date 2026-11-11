@@ -1,4 +1,5 @@
 import type { Order } from '../../shared/store.ts';
+import { publisherLogoPath } from '../../shared/site.ts';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
@@ -13,7 +14,8 @@ export function orderDocument(order: Order & { paymentId: string | null }, custo
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
 <style nonce="${nonce}">
 body{background:#f6f3ed;color:#172743;font:16px/1.5 system-ui,sans-serif;margin:0;padding:20px}main{box-sizing:border-box;max-width:820px;margin:auto;padding:clamp(16px,4vw,40px);background:#fff;border:1px solid #dfdbd2}h1{margin:0 0 .4em;line-height:1.1}h2{font-size:1.1rem;margin-bottom:0}.ref{overflow-wrap:anywhere;color:#42506a}table{width:100%;border-collapse:collapse;margin:1.5rem 0}th,td{padding:.5rem .25rem;text-align:left;border-bottom:1px solid #dfdbd2;vertical-align:top}th:last-child,td:last-child{text-align:right}dl{margin-left:auto;max-width:330px}dl div{display:flex;justify-content:space-between;gap:12px;padding:.25rem 0}dd{margin:0;text-align:right}.total{border-top:1px solid #dfdbd2;font-weight:700}button{font:inherit;background:#172743;color:#fff;border:0;border-radius:5px;padding:.5rem .9rem;cursor:pointer}@media print{body{padding:0;background:white}main{border:0;padding:0}button{display:none}}
-</style></head><body><main><p>BHAGWATI PUBLICATIONS</p><h1>${title}</h1>
+.invoice-logo{display:block;width:220px;max-width:100%;height:auto;margin:0 0 16px}
+</style></head><body><main><img class="invoice-logo" src="${publisherLogoPath}" alt="Bhagwati Publications" width="1600" height="533"><h1>${title}</h1>
 <p class="ref">${reference}<br>Ordered on ${date(order.createdAt)}${order.paidAt ? `<br>Paid on ${date(order.paidAt)}` : ''}</p>
 <h2>${address ? 'Deliver to' : 'Customer'}</h2><p>${escape(address?.fullName ?? customerName)}${address ? `<br>${escape(address.street)}<br>${escape(address.city)}, ${escape(address.state)} ${escape(address.pin)}<br>${escape(address.phone)}` : ''}</p>
 <table><thead><tr><th scope="col">Book</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr></thead><tbody>
