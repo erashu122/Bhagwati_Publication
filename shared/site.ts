@@ -1,5 +1,5 @@
 export const siteOrigin = 'https://bhagwatipublication.vercel.app';
-export const publisherLogoPath = '/bhagwati-publications-logo.jpg';
+export const publisherLogoPath = '/bhagwati-delhi-logo.jpg';
 export const homeTitle = 'Bhagwati Publications | Books for curious minds';
 export const homeDescription = 'Explore the Bhagwati Publications collection of books on business, leadership, technology and Hindi literature.';
 

@@ -4,5 +4,5 @@ export function PublisherLogo({ className = 'publisher-logo', alt = 'Bhagwati Pu
   className?: string;
   alt?: string;
 }) {
-  return <img className={className} src={publisherLogoPath} width="1600" height="533" alt={alt} />;
+  return <img className={className} src={publisherLogoPath} width="1536" height="1024" alt={alt} />;
 }
