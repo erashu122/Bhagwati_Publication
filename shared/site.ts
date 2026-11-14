@@ -7,7 +7,7 @@ export const publicPages: Record<string, string> = {
   '/': 'Home',
   '/books': 'All books',
   '/author': 'Meet the author',
-  '/about': 'Our story',
+  '/about': 'About Us',
   '/contact': 'Contact',
   '/policies/shipping': 'Shipping policy',
   '/policies/returns': 'Returns policy',

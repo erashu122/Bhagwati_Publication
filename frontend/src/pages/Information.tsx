@@ -10,14 +10,18 @@ import { useCatalog } from '../catalog';
 export function About() {
   const { content } = useCatalog();
   return <div className="container section page-content">
-    <p className="eyebrow"><span className="diamond" /> OUR STORY</p>
-    <h1>Bhagwati Publications</h1>
+    <p className="eyebrow"><span className="diamond" /> BHAGWATI PUBLICATIONS</p>
+    <h1>About Us</h1>
     <p className="about-hindi" lang="hi">भगवती प्रकाशन</p>
     <div className="information-grid">
       <div className="prose">
         <p className="lead">{content.aboutLead}</p>
         {content.aboutBody.split(/\n\s*\n/u).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-        <BrowseLink />
+        <div className="inline-actions">
+          <BrowseLink>Browse all books</BrowseLink>
+          <Link className="button secondary" to="/author">Meet the author</Link>
+          <Link className="button secondary" to="/contact">Contact us</Link>
+        </div>
       </div>
       <div className="information-art" aria-hidden="true"><PublisherLogo alt="" /></div>
     </div>
